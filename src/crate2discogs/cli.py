@@ -6,6 +6,7 @@ from typing import Annotated
 
 import typer
 
+from crate2discogs.add_to_collection import apply_plan, build_plan, format_plan, pending_groups
 from crate2discogs.checks import run_checks
 from crate2discogs.config import ConfigError, Settings, load_settings
 from crate2discogs.db import Repo, connect
@@ -152,9 +153,27 @@ def review(
 
 
 @app.command(name="add-to-collection")
-def add_to_collection() -> None:
+def add_to_collection(
+    apply: Annotated[bool, typer.Option("--apply", help="Write to Discogs. Without it: dry run")] = False,
+) -> None:
     """Add resolved releases to the Discogs collection (dry run unless --apply)."""
-    _todo("add-to-collection")
+    settings = _settings()
+    repo = _repo(settings)
+    _log_to_file(settings)
+    client = _client(settings, repo)
+    total = len(pending_groups(repo))
+    with typer.progressbar(length=total, label="checking collection") as bar:
+        rows = build_plan(repo, client, tick=lambda: bar.update(1))
+    typer.echo(format_plan(rows))
+    if not apply:
+        typer.echo("\ndry run: nothing was written. Re-run with --apply to add to the collection.")
+        return
+    with typer.progressbar(length=len(rows), label=f"adding to folder {settings.discogs_folder_id}") as bar:
+        summary = apply_plan(repo, client, settings.discogs_folder_id, rows, tick=lambda: bar.update(1))
+    typer.echo(f"\nadded {summary.added} instances, skipped {summary.skipped}, failed {summary.failed}")
+    if summary.failed:
+        typer.echo("re-run `add-to-collection --apply` to retry the failed ones.")
+        raise typer.Exit(1)
 
 
 @app.command()
