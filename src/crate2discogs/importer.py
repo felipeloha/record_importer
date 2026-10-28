@@ -50,17 +50,24 @@ def make_work_copy(src: Path, dst: Path, max_edge: int) -> None:
     tmp.replace(dst)
 
 
+def import_file(repo: Repo, path: Path, work_dir: Path, max_edge: int) -> tuple[int, bool]:
+    """Import one photo. Returns (photo_id, created)."""
+    sha = sha256_file(path)
+    if repo.has_sha(sha):
+        return repo.upsert_photo(sha, path.resolve(), work_dir / f"{sha}.jpg")
+    work_path = (work_dir / f"{sha}.jpg").resolve()
+    make_work_copy(path, work_path, max_edge)
+    return repo.upsert_photo(sha, path.resolve(), work_path)
+
+
 def import_dir(
     repo: Repo, directory: Path, work_dir: Path, max_edge: int, recursive: bool = False
 ) -> ImportResult:
     new = existing = 0
     for path in scan(directory, recursive):
-        sha = sha256_file(path)
-        if repo.has_sha(sha):
+        _, created = import_file(repo, path, work_dir, max_edge)
+        if created:
+            new += 1
+        else:
             existing += 1
-            continue
-        work_path = (work_dir / f"{sha}.jpg").resolve()
-        make_work_copy(path, work_path, max_edge)
-        repo.upsert_photo(sha, path.resolve(), work_path)
-        new += 1
     return ImportResult(new, existing)

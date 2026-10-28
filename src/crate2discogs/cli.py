@@ -5,6 +5,9 @@ import typer
 
 from crate2discogs.config import ConfigError, Settings, load_settings
 from crate2discogs.db import Repo, connect
+from crate2discogs.evaluate import format_report, load_expected, run_eval
+from crate2discogs.extract import make_extractor
+from crate2discogs.extract.base import ExtractorUnavailable
 from crate2discogs.importer import import_dir
 
 app = typer.Typer(no_args_is_help=True, help="Turn photos of vinyl records into Discogs collection entries.")
@@ -81,9 +84,23 @@ def export() -> None:
 
 
 @app.command(name="eval")
-def eval_() -> None:
+def eval_(
+    expected: Annotated[Path, typer.Option("--expected", exists=True, dir_okay=False)],
+    db: Annotated[Path, typer.Option("--db", help="Separate DB so fixtures never reach the real one")] = Path(
+        "eval.db"
+    ),
+) -> None:
     """Measure accuracy on a labelled fixture set."""
-    _todo("eval")
+    settings = _settings()
+    entries = load_expected(expected)
+    try:
+        report = run_eval(
+            Repo(connect(db)), entries, make_extractor(settings), db.parent / "eval-work", settings.max_edge
+        )
+    except ExtractorUnavailable as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from None
+    typer.echo(format_report(report))
 
 
 def main() -> None:

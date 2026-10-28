@@ -1,0 +1,103 @@
+# Ground truth for the fixture photos, read from the photos.
+# expected_release_id: fill in by hand after checking Discogs (null = not verified yet).
+# duplicate_of: file of another entry showing the same physical record.
+- file: photos/e2f803fa-6075-4620-a80c-5616fe4b6a8e.webp
+  photo_type: shop_sticker
+  artist: Margaret Dygas
+  title: In Wood, That
+  label: Perlon
+  catno: Perlon100
+  ean: null
+  disc_count: null
+  expected_release_id: null
+
+- file: photos/58dae532-d9f3-4907-911c-c296da8f99b8.webp
+  photo_type: center_label
+  artist: Mario Più & Mauro Picotto
+  title: Imperiale
+  label: BXR Club
+  catno: BXRCG 003-12
+  ean: "4036909000014"
+  disc_count: null
+  expected_release_id: null
+
+- file: photos/a236e6b3-9529-4a58-8eb7-09b50c604612.webp
+  photo_type: ean
+  artist: null
+  title: null
+  label: Kompakt
+  catno: null
+  ean: "4250101497384"
+  disc_count: null
+  expected_release_id: null
+
+- file: photos/c761c01c-3545-4c1c-bfb8-bd5a53ac2b33.webp
+  photo_type: shop_sticker
+  artist: Surgeon
+  title: Basictonalvocabulary
+  label: Tresor
+  catno: TRESOR10073LP
+  ean: null
+  disc_count: 2
+  expected_release_id: null
+
+- file: photos/d2e01ef6-03d6-483b-8adf-55a5c8ba5f4c.webp
+  photo_type: shop_sticker
+  artist: Surgeon
+  title: Basictonalvocabulary
+  label: Tresor
+  catno: TRESOR10073LP
+  ean: null
+  disc_count: 2
+  expected_release_id: null
+  duplicate_of: photos/c761c01c-3545-4c1c-bfb8-bd5a53ac2b33.webp
+
+- file: photos/28213b64-65c1-4f0e-9203-9c6d835778ca.webp
+  photo_type: shop_sticker
+  artist: Robert Hood
+  title: Apartement Zero
+  label: Logistic
+  catno: LOG016RE
+  ean: null
+  disc_count: null
+  expected_release_id: null
+
+- file: photos/6c0934f5-f8e8-40da-8d9b-d6dffb1ec316.webp
+  photo_type: back_cover
+  artist: Robert Hood
+  title: null
+  label: M-Plant
+  catno: MPM16LP
+  ean: null
+  disc_count: null
+  expected_release_id: null
+
+- file: photos/c7b90816-860e-4f8f-87b1-ba641f8af865.webp
+  photo_type: center_label
+  artist: null
+  title: 20 Years M-Plant Music
+  label: M-Plant
+  catno: M.PM21
+  ean: null
+  disc_count: null
+  expected_release_id: null
+
+- file: photos/b4fe7e8c-15a2-4ab6-ae05-fdd64a35c722.webp
+  photo_type: shop_sticker
+  artist: Robert Hood
+  title: Paradygm Shift - Volume 1
+  label: Dekmantel
+  catno: DKMNTL 031
+  ean: null
+  disc_count: null
+  expected_release_id: null
+
+- file: photos/b2fd7398-77c6-49ab-9406-e7090324dad8.webp
+  photo_type: shop_sticker
+  artist: Robert Hood
+  title: Paradygm Shift
+  label: Dekmantel
+  catno: DKMNTL 050
+  ean: null
+  disc_count: 2
+  expected_release_id: null
