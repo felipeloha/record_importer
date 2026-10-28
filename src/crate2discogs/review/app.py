@@ -1,5 +1,7 @@
+import asyncio
 import json
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any, Protocol
@@ -159,6 +161,17 @@ def build_queue(repo: Repo) -> Queue:
 
 def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
     app = FastAPI(title="crate2discogs review", docs_url=None, redoc_url=None)
+
+    # One request at a time: `repo` (and the Discogs cache) share a single sqlite connection, and the
+    # browser loads all queue thumbnails in parallel. Single local user, so serialising costs nothing.
+    lock = asyncio.Lock()
+
+    @app.middleware("http")
+    async def one_at_a_time(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        async with lock:
+            return await call_next(request)
 
     def photo_or_404(photo_id: int) -> Photo:
         photo = repo.get_photo(photo_id)

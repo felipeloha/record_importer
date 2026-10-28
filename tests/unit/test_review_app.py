@@ -199,3 +199,16 @@ def test_added_photo_cannot_change(setup: tuple[Repo, TestClient, FakeDiscogs, d
 
 def test_binds_localhost_only() -> None:
     assert HOST == "127.0.0.1"
+
+
+def test_parallel_requests_share_db_safely(
+    setup: tuple[Repo, TestClient, FakeDiscogs, dict[str, int]],
+) -> None:
+    # The queue page makes the browser load all thumbnails at once (regression: sqlite3.InterfaceError).
+    from concurrent.futures import ThreadPoolExecutor
+
+    _, client, _, ids = setup
+    urls = [f"/photos/{pid}/image" for pid in ids.values()] * 10 + ["/"] * 10
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        codes = list(pool.map(lambda u: client.get(u).status_code, urls))
+    assert set(codes) == {200}
