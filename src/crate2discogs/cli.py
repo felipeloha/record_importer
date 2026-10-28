@@ -3,8 +3,10 @@ from typing import Annotated
 
 import typer
 
+from crate2discogs.checks import run_checks
 from crate2discogs.config import ConfigError, Settings, load_settings
 from crate2discogs.db import Repo, connect
+from crate2discogs.discogs import DiscogsClient
 from crate2discogs.evaluate import format_report, load_expected, run_eval
 from crate2discogs.extract import make_extractor
 from crate2discogs.extract.base import ExtractorUnavailable
@@ -34,12 +36,27 @@ def _work_dir(settings: Settings) -> Path:
     return settings.db_path.parent / "work"
 
 
+def _client(settings: Settings, repo: Repo) -> DiscogsClient:
+    return DiscogsClient(
+        settings.discogs_token,
+        settings.discogs_username,
+        settings.user_agent,
+        repo=repo,
+        cache_ttl=settings.cache_ttl_days * 86400,
+    )
+
+
 @app.command()
 def init() -> None:
-    """Create the database and check the configuration."""
+    """Create the database and check config, Discogs token, folder and extractor."""
     settings = _settings()
-    _repo(settings)
+    repo = _repo(settings)
     typer.echo(f"database ready: {settings.db_path}")
+    checks = run_checks(settings, _client(settings, repo))
+    for c in checks:
+        typer.echo(f"{'ok  ' if c.ok else 'FAIL'} {c.name}: {c.detail}")
+    if not all(c.ok for c in checks):
+        raise typer.Exit(1)
 
 
 @app.command(name="import")
