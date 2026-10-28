@@ -1,3 +1,4 @@
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -31,16 +32,25 @@ class Extraction(BaseModel):
     confidence: float | None = Field(default=None, ge=0, le=1)
 
 
+def _clean_hint(h: str) -> str:
+    _, hints, _ = strip_format_hints(f"x ({h.strip().strip('()[]')})")
+    return hints[0] if hints else h.strip().strip("()[]").strip()
+
+
 def postprocess(e: Extraction) -> Extraction:
-    """Move title format hints into structured fields (R-3) and clean EAN digits."""
+    """Move title format hints into structured fields (R-3); clean EAN digits, hints and country."""
     title, hints, discs = strip_format_hints(e.title)
-    merged = list(dict.fromkeys([*e.format_hints, *hints]))
+    merged = list(dict.fromkeys(h for h in (_clean_hint(x) for x in [*e.format_hints, *hints]) if h))
+    if discs is None:
+        discs = next((d for _, _, d in (strip_format_hints(f"x ({h})") for h in merged) if d), None)
+    country = re.sub(r"^\s*(?:made|printed|manufactured)\s+in\s+", "", e.country or "", flags=re.IGNORECASE)
     return e.model_copy(
         update={
             "title": title or None,
             "format_hints": merged,
             "disc_count": e.disc_count if e.disc_count is not None else discs,
             "ean_digits": barcode_key(e.ean_digits) or None,
+            "country": country.strip() or None,
         }
     )
 
@@ -59,4 +69,17 @@ def extraction_schema() -> dict[str, Any]:
     """JSON schema for structured output, with $refs inlined for model runtimes that don't resolve them."""
     schema = Extraction.model_json_schema()
     result: dict[str, Any] = _inline_refs(schema, schema.get("$defs", {}))
+    _require_all(result)
     return result
+
+
+def _require_all(node: Any) -> None:
+    """Mark every property required (values stay nullable) so the model answers each field."""
+    if isinstance(node, dict):
+        if isinstance(node.get("properties"), dict):
+            node["required"] = list(node["properties"])
+        for v in node.values():
+            _require_all(v)
+    elif isinstance(node, list):
+        for v in node:
+            _require_all(v)

@@ -53,8 +53,25 @@ def test_request_body(extractor: OllamaExtractor, image: Path) -> None:
     assert body["messages"][-1]["images"] == [base64.b64encode(image.read_bytes()).decode()]
 
 
-def test_schema_has_no_refs() -> None:
-    assert "$ref" not in json.dumps(extraction_schema())
+def test_schema_has_no_refs_and_requires_every_field() -> None:
+    schema = extraction_schema()
+    assert "$ref" not in json.dumps(schema)
+    assert set(schema["required"]) == set(Extraction.model_fields)
+    track = schema["properties"]["tracklist"]["items"]
+    assert set(track["required"]) == {"position", "title"}
+
+
+def test_postprocess_cleans_hints_and_country() -> None:
+    from crate2discogs.models import postprocess
+
+    e = postprocess(
+        Extraction(
+            title="IN WOOD, THAT (VINYL ONLY)", format_hints=["(VINYL ONLY)"], country="Made in Germany"
+        )
+    )
+    assert (e.title, e.format_hints, e.country) == ("IN WOOD, THAT", ["Vinyl Only"], "Germany")
+    e = postprocess(Extraction(title="PARADYGM SHIFT", format_hints=["(2LP)"]))
+    assert (e.format_hints, e.disc_count) == (["2LP"], 2)
 
 
 @respx.mock
