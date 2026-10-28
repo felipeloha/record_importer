@@ -97,6 +97,12 @@ def identify(
         bool,
         typer.Option("--force", help="With --stage resolve: re-score resolved photos (keeps user choices)"),
     ] = False,
+    allow_api_billing: Annotated[
+        bool,
+        typer.Option(
+            "--allow-api-billing", help="Let the claude-code extractor run with ANTHROPIC_API_KEY set"
+        ),
+    ] = False,
 ) -> None:
     """Decode, extract, match and resolve imported photos. Resumable."""
     settings = _settings()
@@ -112,7 +118,7 @@ def identify(
         try:
             done = identify_photos(
                 repo,
-                extractor=lambda: make_extractor(settings),
+                extractor=lambda: make_extractor(settings, allow_api_billing),
                 search=lambda: _client(settings, repo).search,
                 margin=settings.auto_margin,
                 budget=settings.query_budget,
@@ -195,6 +201,12 @@ def eval_(
         "eval.db"
     ),
     extract_only: Annotated[bool, typer.Option("--extract-only", help="Skip Discogs match/resolve")] = False,
+    allow_api_billing: Annotated[
+        bool,
+        typer.Option(
+            "--allow-api-billing", help="Let the claude-code extractor run with ANTHROPIC_API_KEY set"
+        ),
+    ] = False,
 ) -> None:
     """Measure accuracy on a labelled fixture set."""
     settings = _settings()
@@ -205,7 +217,7 @@ def eval_(
         report = run_eval(
             repo,
             entries,
-            make_extractor(settings),
+            make_extractor(settings, allow_api_billing),
             db.parent / "eval-work",
             settings.max_edge,
             search=search,

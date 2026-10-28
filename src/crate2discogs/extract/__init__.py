@@ -2,9 +2,11 @@ from crate2discogs.config import Settings
 from crate2discogs.extract.base import Extractor
 
 
-def make_extractor(settings: Settings) -> Extractor:
-    if settings.extractor == "ollama":
-        from crate2discogs.extract.ollama import OllamaExtractor
+def make_extractor(settings: Settings, allow_api_billing: bool = False) -> Extractor:
+    if settings.extractor == "claude-code":
+        from crate2discogs.extract.claude_code import ClaudeCodeExtractor
 
-        return OllamaExtractor(settings.ollama_url, settings.ollama_model)
-    raise NotImplementedError(f"extractor {settings.extractor!r} is not implemented yet")
+        return ClaudeCodeExtractor(allow_api_billing=allow_api_billing)
+    from crate2discogs.extract.ollama import OllamaExtractor
+
+    return OllamaExtractor(settings.ollama_url, settings.ollama_model)
