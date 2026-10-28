@@ -7,7 +7,7 @@ from typing import Literal
 from crate2discogs.barcodes import decode, valid_eans
 from crate2discogs.db import BarcodeRow, CandidateRow, ExtractionRow, Photo, Repo, ResolutionRow, Stage
 from crate2discogs.extract.base import ExtractionFailed, Extractor
-from crate2discogs.models import Extraction
+from crate2discogs.models import Extraction, postprocess
 from crate2discogs.scoring import Scored, rank, resolve
 from crate2discogs.search import Search, run_search
 
@@ -24,8 +24,9 @@ def _noop() -> None:
 
 
 def load_extraction(repo: Repo, photo_id: int) -> Extraction | None:
+    """Stored extraction, re-cleaned so post-processing fixes apply without re-running the model."""
     row = repo.get_extraction(photo_id)
-    return Extraction.model_validate_json(row.parsed_json) if row and row.parsed_json else None
+    return postprocess(Extraction.model_validate_json(row.parsed_json)) if row and row.parsed_json else None
 
 
 def candidate_rows(ranked: list[Scored]) -> list[CandidateRow]:
@@ -52,7 +53,9 @@ def input_stages(step: StepName, force: bool = False) -> tuple[Stage, ...]:
     inputs: dict[StepName, tuple[Stage, ...]] = {
         "decode": ("imported",),
         "extract": ("decoded",),
-        "match": ("extracted", "extract_failed"),
+        "match": ("extracted", "extract_failed", "matched", "resolved")
+        if force
+        else ("extracted", "extract_failed"),
         "resolve": ("matched", "resolved") if force else ("matched",),
     }
     return inputs[step]
@@ -134,12 +137,14 @@ def run_match(
     variant_cap: int = 6,
     limit: int | None = None,
     tick: Tick = _noop,
+    force: bool = False,
 ) -> int:
     """Search Discogs for photos at `extracted` or `extract_failed` and store the candidates.
 
+    `force` also re-searches matched/resolved photos (not added ones); user choices are kept by resolve.
     Discogs errors (after retries) stop the stage; a re-run continues where it stopped.
     """
-    photos = _select(repo, input_stages("match"), limit)
+    photos = _select(repo, input_stages("match", force), limit)
     for photo in photos:
         extraction = load_extraction(repo, photo.id)
         barcodes = repo.get_barcodes(photo.id)
@@ -219,7 +224,7 @@ def identify(
         elif name == "extract":
             done[name] = run_extract(repo, extractor(), always_extract, limit, tick)
         elif name == "match":
-            done[name] = run_match(repo, search(), budget, variant_cap, limit, tick)
+            done[name] = run_match(repo, search(), budget, variant_cap, limit, tick, force)
         else:
             done[name] = run_resolve(repo, margin, force, limit, tick)
     return done

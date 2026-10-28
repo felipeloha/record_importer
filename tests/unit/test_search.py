@@ -46,8 +46,20 @@ def test_valid_ean_first() -> None:
 def test_catno_label_then_variants_in_order() -> None:
     qs = [_strip(q) for q in build_queries(Extraction(catno="LOGO16RE", label="Logistic"), [])]
     assert qs[0] == {"catno": "LOGO16RE", "label": "Logistic"}
-    assert qs[1] == {"catno": "LOG016RE"}
+    assert qs[1] == {"catno": "LOGO16RE"}
+    assert qs[2] == {"catno": "LOG016RE"}
     assert all(set(q) == {"catno"} for q in qs[1:])
+
+
+def test_artist_queries_before_ocr_variants() -> None:
+    e = Extraction(catno="Perlon100", label="Perlon", artist="Margaret Dygas", title="In Wood, That")
+    qs = [_strip(q) for q in build_queries(e, [])]
+    assert qs[:4] == [
+        {"catno": "Perlon100", "label": "Perlon"},
+        {"artist": "Margaret Dygas", "release_title": "In Wood, That"},
+        {"artist": "Margaret Dygas", "label": "Perlon"},
+        {"q": "Margaret Dygas In Wood, That"},
+    ]
 
 
 def test_variants_keep_printed_punctuation() -> None:
@@ -87,15 +99,15 @@ def test_stops_after_catno_match_even_if_ambiguous() -> None:
 
 
 def test_continues_while_no_catno_match() -> None:
-    # Discogs returns a near miss for the printed catno; the OCR variant then finds the real one.
+    # Near miss for the printed catno (with and without label); the OCR variant then finds the real one.
     fake = FakeSearch(
         {
-            _key(catno="LOGO16RE", label="Logistic"): [FIX["hood_other_catno"]],
+            _key(catno="LOGO16RE", label="Logistic"): [FIX["hood_other_catno"] | {"catno": "LOG025"}],
             _key(catno="LOG016RE"): [FIX["hood_logistic"]],
         }
     )
     res = run_search(fake, Extraction(catno="LOGO16RE", label="Logistic"), [])
-    assert res.calls == 2
+    assert res.calls == 3
     assert {c[0]["id"] for c in res.candidates} == {401, 402}
 
 

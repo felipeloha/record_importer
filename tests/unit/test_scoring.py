@@ -98,6 +98,7 @@ def test_monotonic_adding_matching_field_never_lowers(extra: str) -> None:
     fields: dict[str, Any] = {
         "barcode": {"ean_digits": "4036909000014"},
         "catno": {"catno": "BXRCG 003-12"},
+        "catno_similar": {"catno": "BXRCG 312"},
         "artist": {"artist": "Mario Piu & Mauro Picotto"},
         "title": {"title": "Imperiale"},
         "label": {"label": "BXR Club"},
@@ -118,6 +119,22 @@ def test_regression_catno_differs_never_auto() -> None:
     r = _resolve([_c("hood_other_catno")], e)
     assert r.outcome == "review"
     assert not r.ranked[0].hard_match
+
+
+@pytest.mark.parametrize(
+    ("ours", "theirs"),
+    [("Perlon100", "PERL100"), ("TRESOR10073LP", "Tresor. 10073"), ("LOG016RE", "log 16")],
+)
+def test_shop_catno_similar_found_but_never_auto(ours: str, theirs: str) -> None:
+    s = score(_c("dekmantel_031", catno=theirs), Extraction(catno=ours), [])
+    assert "catno_similar" in s.matched
+    assert s.found and not s.hard_match
+    assert resolve([s], MARGIN).outcome == "review"
+
+
+def test_title_without_spaces_matches() -> None:
+    cand = _c("surgeon_2lp")
+    assert "title" in score(cand, Extraction(title="BASIC TIONAL VOCABULARY"), []).matched
 
 
 def test_label_suffix_and_case_ignored() -> None:

@@ -90,7 +90,10 @@ def identify(
     always_extract: Annotated[bool, typer.Option("--always-extract")] = False,
     force: Annotated[
         bool,
-        typer.Option("--force", help="With --stage resolve: re-score resolved photos (keeps user choices)"),
+        typer.Option(
+            "--force",
+            help="Redo match/resolve for photos already past them (not added ones). Keeps user choices",
+        ),
     ] = False,
     allow_api_billing: Annotated[
         bool,

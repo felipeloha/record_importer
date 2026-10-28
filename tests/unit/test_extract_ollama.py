@@ -185,3 +185,12 @@ def test_pipeline_stops_when_extractor_unavailable(tmp_path: Path) -> None:
     with pytest.raises(ExtractorUnavailable):
         run_extract(repo, Down())
     assert all(p.stage == "decoded" for p in repo.all_photos())
+
+
+def test_postprocess_cleans_catno() -> None:
+    from crate2discogs.models import postprocess
+
+    e = postprocess(Extraction(catno="M-PLANT M.PM21", label="M-PLANT MUSIC"))
+    assert e.catno == "M.PM21"
+    e = postprocess(Extraction(catno="4250101497384", label="Kompakt"))
+    assert (e.catno, e.ean_digits) == (None, "4250101497384")

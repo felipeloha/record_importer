@@ -1,6 +1,13 @@
 import pytest
 
-from crate2discogs.normalize import barcode_key, catno_key, catno_variants, strip_format_hints, text_key
+from crate2discogs.normalize import (
+    barcode_key,
+    catno_key,
+    catno_similar,
+    catno_variants,
+    strip_format_hints,
+    text_key,
+)
 
 
 @pytest.mark.parametrize(
@@ -76,3 +83,20 @@ def test_text_key() -> None:
 def test_barcode_key() -> None:
     assert barcode_key("4 250101 497384") == "4250101497384"
     assert barcode_key("4-036909-000014 (EAN)") == "4036909000014"
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "same"),
+    [
+        ("Perlon100", "PERL100", True),
+        ("TRESOR10073LP", "Tresor. 10073", True),
+        ("LOG016RE", "log 16", True),
+        ("DKMNTL 031", "DKMNTL031", True),
+        ("M.PM21", "MPM 213", False),
+        ("DKMNTL 031", "DKMNTL 050", False),
+        ("LOG016RE", "ABC16", False),
+        ("", "X1", False),
+    ],
+)
+def test_catno_similar(a: str, b: str, same: bool) -> None:
+    assert catno_similar(a, b) is same

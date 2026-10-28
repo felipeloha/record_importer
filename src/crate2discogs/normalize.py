@@ -21,6 +21,20 @@ def catno_key(s: str | None) -> str:
     return re.sub(r"[\s.\-/_]", "", s or "").upper()
 
 
+_CATNO_PARTS = re.compile(r"([A-Z]+)0*(\d+)[A-Z]*")
+
+
+def catno_similar(a: str | None, b: str | None) -> bool:
+    """Shop stickers often write a label's catno differently: same number, one letter prefix starts with
+    the other, suffixes ignored. Perlon100 ≈ PERL100, TRESOR10073LP ≈ Tresor. 10073, LOG016RE ≈ log16.
+    """
+    ma, mb = _CATNO_PARTS.fullmatch(catno_key(a)), _CATNO_PARTS.fullmatch(catno_key(b))
+    if not ma or not mb or ma.group(2) != mb.group(2):
+        return False
+    pa, pb = ma.group(1), mb.group(1)
+    return min(len(pa), len(pb)) >= 2 and (pa.startswith(pb) or pb.startswith(pa))
+
+
 def catno_variants(s: str | None, cap: int = 6) -> list[str]:
     """OCR-confusion variants (O↔0, I↔1, S↔5, B↔8) at positions next to a digit.
 

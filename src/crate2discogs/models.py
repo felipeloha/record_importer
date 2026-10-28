@@ -37,19 +37,34 @@ def _clean_hint(h: str) -> str:
     return hints[0] if hints else h.strip().strip("()[]").strip()
 
 
+def _clean_catno(catno: str | None, label: str | None) -> str | None:
+    """Drop a leading label name the model copied into the catno: 'M-PLANT M.PM21' → 'M.PM21'."""
+    if not catno:
+        return None
+    first, _, rest = catno.strip().partition(" ")
+    label_words = (label or "").upper().split()
+    if rest and label_words and first.upper() == label_words[0]:
+        return rest.strip()
+    return catno.strip()
+
+
 def postprocess(e: Extraction) -> Extraction:
     """Move title format hints into structured fields (R-3); clean EAN digits, hints and country."""
     title, hints, discs = strip_format_hints(e.title)
     merged = list(dict.fromkeys(h for h in (_clean_hint(x) for x in [*e.format_hints, *hints]) if h))
     if discs is None:
         discs = next((d for _, _, d in (strip_format_hints(f"x ({h})") for h in merged) if d), None)
+    catno, ean_digits = _clean_catno(e.catno, e.label), barcode_key(e.ean_digits) or None
+    if catno and catno.isdigit() and len(catno) in (8, 12, 13):
+        ean_digits, catno = ean_digits or catno, None  # the model put the EAN digits in catno
     country = re.sub(r"^\s*(?:made|printed|manufactured)\s+in\s+", "", e.country or "", flags=re.IGNORECASE)
     return e.model_copy(
         update={
             "title": title or None,
             "format_hints": merged,
             "disc_count": e.disc_count if e.disc_count is not None else discs,
-            "ean_digits": barcode_key(e.ean_digits) or None,
+            "ean_digits": ean_digits,
+            "catno": catno,
             "country": country.strip() or None,
         }
     )

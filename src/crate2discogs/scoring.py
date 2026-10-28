@@ -7,12 +7,13 @@ from rapidfuzz import fuzz
 from crate2discogs.barcodes import ean_checksum_valid, valid_eans
 from crate2discogs.db import BarcodeRow
 from crate2discogs.models import Extraction
-from crate2discogs.normalize import barcode_key, catno_key, catno_variants, text_key
+from crate2discogs.normalize import barcode_key, catno_key, catno_similar, catno_variants, text_key
 
 # Points per matching field. The score only ranks candidates; the outcome rules are in `resolve`.
 WEIGHTS: dict[str, float] = {
     "barcode": 5.0,
     "catno": 4.0,
+    "catno_similar": 3.0,
     "artist": 1.5,
     "title": 1.5,
     "label": 1.0,
@@ -29,10 +30,15 @@ Outcome = Literal["auto", "review", "not_found"]
 class Scored:
     release_id: int
     score: float
-    hard_match: bool  # barcode or catno matched: required for `auto`
+    hard_match: bool  # barcode or exact catno matched: required for `auto`
     matched: tuple[str, ...]
     payload: dict[str, Any]
     source_query: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def found(self) -> bool:
+        """Identified by barcode or catno (exact or similar): the search can stop."""
+        return self.hard_match or "catno_similar" in self.matched
 
 
 @dataclass(frozen=True)
@@ -101,8 +107,18 @@ def candidate_disc_count(c: dict[str, Any]) -> int | None:
 
 
 def _fuzzy(a: str | None, options: list[str]) -> bool:
+    """Fuzzy match, also with spaces removed: 'BASIC TIONAL VOCABULARY' ≈ 'Basictonalvocabulary'."""
     ka = text_key(a)
-    return bool(ka) and any(fuzz.token_set_ratio(ka, text_key(o)) >= FUZZY_MIN for o in options if o)
+    if not ka:
+        return False
+    for o in options:
+        ko = text_key(o)
+        if ko and (
+            fuzz.token_set_ratio(ka, ko) >= FUZZY_MIN
+            or fuzz.ratio(ka.replace(" ", ""), ko.replace(" ", "")) >= FUZZY_MIN
+        ):
+            return True
+    return False
 
 
 def score(candidate: dict[str, Any], extraction: Extraction | None, barcodes: list[BarcodeRow]) -> Scored:
@@ -110,8 +126,11 @@ def score(candidate: dict[str, Any], extraction: Extraction | None, barcodes: li
     matched: list[str] = []
     if set(our_eans(extraction, barcodes)) & candidate_barcodes(candidate):
         matched.append("barcode")
-    if catno_keys(extraction) & {catno_key(c) for c in candidate_catnos(candidate)}:
+    theirs = candidate_catnos(candidate)
+    if catno_keys(extraction) & {catno_key(c) for c in theirs}:
         matched.append("catno")
+    elif e.catno and any(catno_similar(e.catno, c) for c in theirs):
+        matched.append("catno_similar")
     artist, title = candidate_artist_title(candidate)
     if _fuzzy(e.artist, [artist]):
         matched.append("artist")

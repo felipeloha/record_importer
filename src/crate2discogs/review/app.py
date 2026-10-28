@@ -1,10 +1,11 @@
-import asyncio
+import functools
 import json
 import re
-from collections.abc import Awaitable, Callable
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Any, ParamSpec, Protocol, TypeVar
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -19,6 +20,8 @@ from crate2discogs.scoring import candidate_artist_title, candidate_catnos, cand
 
 HOST = "127.0.0.1"
 PORT = 8765
+P = ParamSpec("P")
+R = TypeVar("R")
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 _RELEASE_URL = re.compile(r"discogs\.com/(?:[a-z]{2}/)?release/(\d+)", re.IGNORECASE)
@@ -163,15 +166,17 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
     app = FastAPI(title="crate2discogs review", docs_url=None, redoc_url=None)
 
     # One request at a time: `repo` (and the Discogs cache) share a single sqlite connection, and the
-    # browser loads all queue thumbnails in parallel. Single local user, so serialising costs nothing.
-    lock = asyncio.Lock()
+    # browser loads all queue thumbnails in parallel. Sync handlers run in worker threads, so a thread
+    # lock around each handler serialises them. Single local user, so this costs nothing.
+    lock = threading.RLock()
 
-    @app.middleware("http")
-    async def one_at_a_time(
-        request: Request, call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
-        async with lock:
-            return await call_next(request)
+    def serialised(fn: Callable[P, R]) -> Callable[P, R]:
+        @functools.wraps(fn)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            with lock:
+                return fn(*args, **kwargs)
+
+        return wrapper
 
     def photo_or_404(photo_id: int) -> Photo:
         photo = repo.get_photo(photo_id)
@@ -213,10 +218,12 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
         )
 
     @app.get("/", response_class=HTMLResponse)
+    @serialised
     def queue_page(request: Request) -> HTMLResponse:
         return TEMPLATES.TemplateResponse(request, "queue.html", {"q": build_queue(repo)})
 
     @app.get("/photos/{photo_id}/image")
+    @serialised
     def photo_image(photo_id: int) -> FileResponse:
         photo = photo_or_404(photo_id)
         if not photo.work_path.is_file():
@@ -224,6 +231,7 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
         return FileResponse(photo.work_path, media_type="image/jpeg")
 
     @app.get("/photos/{photo_id}", response_class=HTMLResponse)
+    @serialised
     def photo_page(request: Request, photo_id: int) -> HTMLResponse:
         return render_photo(request, photo_or_404(photo_id))
 
@@ -233,6 +241,7 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
         repo.save_resolution(photo.id, ResolutionRow(outcome or kept, release_id, "user"))  # type: ignore[arg-type]
 
     @app.post("/photos/{photo_id}/pick")
+    @serialised
     def pick(photo_id: int, release_id: Annotated[int, Form()]) -> Response:
         photo = photo_or_404(photo_id)
         editable_or_409(photo)
@@ -240,6 +249,7 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
         return RedirectResponse(next_url(photo_id), 303)
 
     @app.post("/photos/{photo_id}/paste")
+    @serialised
     def paste(request: Request, photo_id: int, value: Annotated[str, Form()]) -> Response:
         photo = photo_or_404(photo_id)
         editable_or_409(photo)
@@ -256,6 +266,7 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
         return RedirectResponse(next_url(photo_id), 303)
 
     @app.post("/photos/{photo_id}/skip")
+    @serialised
     def skip(photo_id: int) -> Response:
         photo = photo_or_404(photo_id)
         editable_or_409(photo)
@@ -263,6 +274,7 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
         return RedirectResponse(next_url(photo_id), 303)
 
     @app.post("/photos/{photo_id}/undo")
+    @serialised
     def undo(photo_id: int) -> Response:
         """Drop the user's decision and restore the automatic result (no Discogs calls)."""
         photo = photo_or_404(photo_id)
@@ -272,6 +284,7 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
         return RedirectResponse(f"/photos/{photo_id}", 303)
 
     @app.post("/releases/{release_id}/copies")
+    @serialised
     def set_copies(
         release_id: int, copies: Annotated[int, Form(ge=1, le=99)], back: Annotated[str, Form()] = "/"
     ) -> Response:

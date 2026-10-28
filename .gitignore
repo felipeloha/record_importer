@@ -12,3 +12,5 @@ __pycache__/
 htmlcov/
 work/
 eval-work/
+crate2discogs.log
+*.backup*.db

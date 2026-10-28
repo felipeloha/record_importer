@@ -19,14 +19,14 @@ STAGES: tuple[Stage, ...] = (
     "added",
 )
 
-# `resolved → resolved` allows re-scoring (identify --stage resolve --force).
+# `resolved → matched/resolved` allow re-searching and re-scoring (identify --force).
 _TRANSITIONS: dict[str, set[str]] = {
     "imported": {"decoded"},
     "decoded": {"extracted", "extract_failed"},
     "extract_failed": {"extracted", "extract_failed", "matched"},
     "extracted": {"matched"},
-    "matched": {"resolved"},
-    "resolved": {"resolved", "added"},
+    "matched": {"matched", "resolved"},
+    "resolved": {"matched", "resolved", "added"},
     "added": set(),
 }
 

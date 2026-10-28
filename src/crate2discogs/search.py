@@ -36,13 +36,19 @@ def build_queries(
     queries: list[dict[str, Any]] = [{"barcode": ean} for ean in our_eans(extraction, barcodes)]
     if catno:
         queries.append({"catno": catno, "label": label} if label else {"catno": catno})
+    # Shop stickers often print their own catno spelling, so artist/label queries come before OCR guesses.
+    if artist and title:
+        queries.append({"artist": artist, "release_title": title})
+    if artist and label:
+        queries.append({"artist": artist, "label": label})
+    if artist or title:
+        queries.append({"q": " ".join(x for x in (artist, title) if x)})
+    if catno:
+        if label:
+            queries.append({"catno": catno})
         alternatives = [c for c in (_clean(x, e.shop_code) for x in e.catno_candidates) if c]
         for v in [*alternatives, *catno_variants(catno, cap=variant_cap)]:
             queries.append({"catno": v})
-    if artist and title:
-        queries.append({"artist": artist, "release_title": title} | ({"label": label} if label else {}))
-    if artist or title:
-        queries.append({"q": " ".join(x for x in (artist, title) if x)})
 
     out: list[dict[str, Any]] = []
     for q in queries:
@@ -65,7 +71,8 @@ def run_search(
     budget: int = 8,
     variant_cap: int = 6,
 ) -> SearchResult:
-    """Run queries in order until a candidate matches on barcode or catno, or the budget is used.
+    """Run queries in order until a candidate matches on barcode or catno (exact or similar), or the budget
+    is used.
 
     Further queries could only add competitors; `resolve` then decides auto or review.
     """
@@ -75,6 +82,6 @@ def run_search(
         results = search(**query).get("results", [])
         calls += 1
         candidates.extend((r, query) for r in results)
-        if any(s.hard_match for s in rank(candidates, extraction, barcodes)):
+        if any(s.found for s in rank(candidates, extraction, barcodes)):
             break
     return SearchResult(candidates, calls)
