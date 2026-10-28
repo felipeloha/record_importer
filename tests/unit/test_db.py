@@ -65,7 +65,7 @@ def test_extract_failed_can_be_retried(repo: Repo) -> None:
 
 @pytest.mark.parametrize(
     ("path", "illegal"),
-    [((), "added"), ((), "matched"), (("decoded",), "resolved"), (("decoded", "extract_failed"), "matched")],
+    [((), "added"), ((), "matched"), (("decoded",), "resolved"), (("decoded", "extract_failed"), "resolved")],
 )
 def test_illegal_stage_jump_rejected(repo: Repo, path: tuple[str, ...], illegal: str) -> None:
     pid = _photo(repo)

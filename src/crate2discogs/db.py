@@ -23,7 +23,7 @@ STAGES: tuple[Stage, ...] = (
 _TRANSITIONS: dict[str, set[str]] = {
     "imported": {"decoded"},
     "decoded": {"extracted", "extract_failed"},
-    "extract_failed": {"extracted", "extract_failed"},
+    "extract_failed": {"extracted", "extract_failed", "matched"},
     "extracted": {"matched"},
     "matched": {"resolved"},
     "resolved": {"resolved", "added"},
