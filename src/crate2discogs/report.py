@@ -7,7 +7,7 @@ from crate2discogs.db import STAGES, Repo
 @dataclass(frozen=True)
 class Status:
     stages: dict[str, int]
-    outcomes: dict[str, int]  # "auto", "review", ...; user choices as "<outcome> (user)"
+    outcomes: dict[str, int]  # "auto", "review", "not_found"; user decisions as "picked (user)"/"skip (user)"
     errors: int
 
 
@@ -15,7 +15,10 @@ def status_counts(repo: Repo) -> Status:
     stages = Counter(p.stage for p in repo.all_photos())
     outcomes: Counter[str] = Counter()
     for row in repo.conn.execute("SELECT outcome, resolved_by FROM resolutions"):
-        outcomes[row["outcome"] + (" (user)" if row["resolved_by"] == "user" else "")] += 1
+        if row["resolved_by"] == "user":
+            outcomes["skip (user)" if row["outcome"] == "skip" else "picked (user)"] += 1
+        else:
+            outcomes[row["outcome"]] += 1
     errors = repo.conn.execute("SELECT COUNT(*) FROM photos WHERE last_error IS NOT NULL").fetchone()[0]
     return Status({s: stages.get(s, 0) for s in STAGES}, dict(sorted(outcomes.items())), errors)
 
