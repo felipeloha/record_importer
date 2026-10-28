@@ -17,15 +17,10 @@ from crate2discogs.extract.base import ExtractorUnavailable
 from crate2discogs.importer import import_dir
 from crate2discogs.pipeline import StepName
 from crate2discogs.pipeline import identify as identify_photos
-from crate2discogs.report import format_status, status_counts
+from crate2discogs.report import export_csv, format_status, status_counts
 from crate2discogs.review.app import HOST, PORT, create_app
 
 app = typer.Typer(no_args_is_help=True, help="Turn photos of vinyl records into Discogs collection entries.")
-
-
-def _todo(name: str) -> None:
-    typer.echo(f"{name}: not implemented yet")
-    raise typer.Exit(1)
 
 
 def _settings() -> Settings:
@@ -189,9 +184,10 @@ def status() -> None:
 
 
 @app.command()
-def export() -> None:
+def export(csv_path: Annotated[Path, typer.Option("--csv", dir_okay=False)]) -> None:
     """Export one row per photo to CSV."""
-    _todo("export")
+    n = export_csv(_repo(_settings()), csv_path)
+    typer.echo(f"wrote {n} rows to {csv_path}")
 
 
 @app.command(name="eval")
