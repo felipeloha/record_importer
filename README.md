@@ -40,6 +40,7 @@ uv run crate2discogs add-to-collection --apply
 uv run crate2discogs status
 uv run crate2discogs export --csv out.csv
 uv run crate2discogs identify --force      # search Discogs again for everything not yet added
+uv run crate2discogs identify --retry-skipped   # also undo your 'skip' decisions, then search again
 uv run crate2discogs reset                 # delete DB, work copies and log; asks first
 ```
 

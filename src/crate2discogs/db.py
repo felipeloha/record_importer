@@ -308,6 +308,14 @@ class Repo:
     def delete_resolution(self, photo_id: int) -> None:
         self.conn.execute("DELETE FROM resolutions WHERE photo_id = ?", (photo_id,))
 
+    def clear_user_skips(self) -> int:
+        """Remove the user's `skip` decisions for photos not yet added. Picks are kept. Returns count."""
+        cur = self.conn.execute(
+            "DELETE FROM resolutions WHERE resolved_by = 'user' AND outcome = 'skip'"
+            " AND photo_id IN (SELECT id FROM photos WHERE stage = 'resolved')"
+        )
+        return cur.rowcount
+
     def get_resolution(self, photo_id: int) -> ResolutionRow | None:
         r = self.conn.execute("SELECT * FROM resolutions WHERE photo_id = ?", (photo_id,)).fetchone()
         if r is None:

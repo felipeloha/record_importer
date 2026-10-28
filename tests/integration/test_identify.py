@@ -181,3 +181,21 @@ def test_cli_identify_stage_decode_and_status(tmp_path: Path, monkeypatch: pytes
     status = runner.invoke(app, ["status"])
     assert status.exit_code == 0
     assert "decoded" in status.output
+
+
+def test_retry_skipped_flow(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _run(repo, FakeExtractor(), FakeSearch())
+    from crate2discogs.db import ResolutionRow
+
+    repo.save_resolution(1, ResolutionRow("skip", None, "user"))
+    repo.save_resolution(2, ResolutionRow("review", 999, "user"))
+    assert repo.clear_user_skips() == 1
+    ext = FakeExtractor()
+    search = FakeSearch()
+    _run(repo, ext, search, force=True)
+    assert ext.calls == []  # no re-extraction
+    assert search.calls > 0  # searched again
+    r1, r2 = repo.get_resolution(1), repo.get_resolution(2)
+    assert r1 is not None and (r1.outcome, r1.release_id, r1.resolved_by) == ("auto", 201, "auto")
+    assert r2 is not None and (r2.release_id, r2.resolved_by) == (999, "user")

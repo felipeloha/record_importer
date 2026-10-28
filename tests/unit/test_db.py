@@ -169,3 +169,20 @@ def test_cache_roundtrip(repo: Repo) -> None:
 def test_photo_fk_enforced(repo: Repo) -> None:
     with pytest.raises(sqlite3.IntegrityError):
         repo.replace_barcodes(12345, [BarcodeRow("EAN13", "1", True)])
+
+
+def test_clear_user_skips_keeps_picks_and_added(repo: Repo) -> None:
+    ids = [_photo(repo, c * 64) for c in "abcd"]
+    for pid in ids:
+        for stage in ("decoded", "extracted", "matched", "resolved"):
+            repo.set_stage(pid, stage)  # type: ignore[arg-type]
+    repo.save_resolution(ids[0], ResolutionRow("skip", None, "user"))
+    repo.save_resolution(ids[1], ResolutionRow("review", 42, "user"))
+    repo.save_resolution(ids[2], ResolutionRow("review", None, "auto"))
+    repo.save_resolution(ids[3], ResolutionRow("skip", None, "user"))
+    repo.set_stage(ids[3], "added")
+    assert repo.clear_user_skips() == 1
+    assert repo.get_resolution(ids[0]) is None
+    r1, r3 = repo.get_resolution(ids[1]), repo.get_resolution(ids[3])
+    assert r1 is not None and r1.release_id == 42
+    assert r3 is not None and r3.outcome == "skip"

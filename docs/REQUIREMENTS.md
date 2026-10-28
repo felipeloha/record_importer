@@ -109,7 +109,7 @@ Outcome per photo, decided by two rules:
 - Store the returned instance ID. Re-running never double-adds.
 
 ### Conflict rule
-User choices always win. Re-running `identify` (including `--force`) never overwrites a resolution set in review (`resolved_by=user`). To redo a user choice, change it in review.
+User choices always win. Re-running `identify` (including `--force`) never overwrites a resolution set in review (`resolved_by=user`). To redo a user choice, change it in review ("Undo my choice"), or run `identify --retry-skipped` to remove all `skip` decisions at once (picks are kept) and search those photos again.
 
 ### FR-9 Status, export, eval
 - `status`: counts per stage and outcome.
@@ -121,7 +121,7 @@ User choices always win. Re-running `identify` (including `--force`) never overw
 crate2discogs init                          # create db + check config, Discogs token, folder, Ollama model
 crate2discogs import <dir> [--recursive]
 crate2discogs identify [--stage decode|extract|match|resolve] [--limit N] [--always-extract]
-                       [--force] [--allow-api-billing]
+                       [--force] [--retry-skipped] [--allow-api-billing]
 crate2discogs review
 crate2discogs add-to-collection [--apply]
 crate2discogs status

@@ -100,6 +100,13 @@ def identify(
             help="Redo match/resolve for photos already past them (not added ones). Keeps user choices",
         ),
     ] = False,
+    retry_skipped: Annotated[
+        bool,
+        typer.Option(
+            "--retry-skipped",
+            help="Remove your 'skip' decisions (picks are kept) and redo match/resolve, like --force",
+        ),
+    ] = False,
     allow_api_billing: Annotated[
         bool,
         typer.Option(
@@ -111,6 +118,9 @@ def identify(
     settings = _settings()
     repo = _repo(settings)
     log_path = _log_to_file(settings)
+    if retry_skipped:
+        typer.echo(f"cleared {repo.clear_user_skips()} skip decisions; searching again")
+        force = True
 
     with ExitStack() as stack:
 
