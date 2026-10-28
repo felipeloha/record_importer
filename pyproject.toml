@@ -53,7 +53,7 @@ python_version = "3.12"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["zxingcpp", "barcode.*", "pillow_heif", "respx"]
+module = ["barcode.*", "pillow_heif", "respx"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
