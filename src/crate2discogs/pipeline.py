@@ -1,14 +1,58 @@
+import json
 import logging
 from collections.abc import Callable
 from pathlib import Path
 
 from crate2discogs.barcodes import decode, valid_eans
-from crate2discogs.db import BarcodeRow, ExtractionRow, Repo
+from crate2discogs.db import BarcodeRow, CandidateRow, ExtractionRow, Photo, Repo, ResolutionRow
 from crate2discogs.extract.base import ExtractionFailed, Extractor
+from crate2discogs.models import Extraction
+from crate2discogs.scoring import Scored, rank, resolve
 
 log = logging.getLogger(__name__)
 
 Decoder = Callable[[Path], list[BarcodeRow]]
+
+
+def load_extraction(repo: Repo, photo_id: int) -> Extraction | None:
+    row = repo.get_extraction(photo_id)
+    return Extraction.model_validate_json(row.parsed_json) if row and row.parsed_json else None
+
+
+def candidate_rows(ranked: list[Scored]) -> list[CandidateRow]:
+    return [
+        CandidateRow(
+            s.release_id, i, s.score, json.dumps(s.source_query, sort_keys=True), json.dumps(s.payload)
+        )
+        for i, s in enumerate(ranked)
+    ]
+
+
+def run_resolve(repo: Repo, margin: float, force: bool = False, limit: int | None = None) -> int:
+    """Score stored candidates and decide the outcome for photos at `matched`.
+
+    `force` also re-scores `resolved` photos (no Discogs calls). User resolutions are never replaced.
+    """
+    photos: list[Photo] = repo.photos_at_stage("matched", limit)
+    if force:
+        photos += repo.photos_at_stage("resolved", None if limit is None else max(0, limit - len(photos)))
+    for photo in photos:
+        stored = [
+            (json.loads(c.payload_json), json.loads(c.source_query)) for c in repo.get_candidates(photo.id)
+        ]
+        ranked = rank(stored, load_extraction(repo, photo.id), repo.get_barcodes(photo.id))
+        result = resolve(ranked, margin)
+        repo.replace_candidates(photo.id, candidate_rows(ranked))
+        written = repo.save_resolution(photo.id, ResolutionRow(result.outcome, result.release_id, "auto"))
+        repo.set_stage(photo.id, "resolved")
+        log.info(
+            "resolve photo=%s outcome=%s release=%s kept_user_choice=%s",
+            photo.id,
+            result.outcome,
+            result.release_id,
+            not written,
+        )
+    return len(photos)
 
 
 def run_decode(repo: Repo, limit: int | None = None, decoder: Decoder = decode) -> int:

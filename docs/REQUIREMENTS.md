@@ -70,7 +70,7 @@ Queries run in order and stop as soon as the candidates found so far give an `au
 - Per-photo query budget: default 8 Discogs calls.
 
 ### FR-5 Scoring and outcome
-Each candidate gets a score from field agreement. The score only ranks candidates:
+Each candidate gets a score: the sum of points for each field that matches. The score only ranks candidates:
 - barcode exact match (strongest; Discogs barcodes are compared digits-only)
 - normalised catno exact match
 - label match (fuzzy)
@@ -83,7 +83,7 @@ Outcome per photo, decided by two rules:
 - `not_found`: no candidates.
 - `skip`: set only by the user in review.
 
-`AUTO_MARGIN` is a config value, tuned on the fixture set (see §6).
+`AUTO_MARGIN` is a config value in points (default 1.0: one matching disc count separates two pressings; year or country alone does not), tuned on the fixture set (see §6).
 
 ### FR-6 Deduplication and copies
 - Photos that resolve to the same `release_id` form one group.

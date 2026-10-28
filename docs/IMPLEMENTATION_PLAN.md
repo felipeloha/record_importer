@@ -211,7 +211,7 @@ Built before the search cascade because the cascade stops on `resolve(...) == au
 - `score(candidate, extraction, barcodes) -> float`: weighted features (barcode, catno key, label, artist, title, disc_count, year, country). Ranks candidates only.
 - `resolve(candidates) -> auto | review | not_found` per FR-5: `auto` only if the top candidate matches on barcode or catno key **and** leads the runner-up by `AUTO_MARGIN` (or has no runner-up).
 
-Weights and `AUTO_MARGIN` come from config. Search results carry `format_quantity`/`formats` (verify); if not, `disc_count` is not used for scoring. Pipeline stage `resolve`.
+Points per matching field are constants in `scoring.py` (barcode 5, catno 4, artist 1.5, title 1.5, label 1, disc_count 1, year 0.5, country 0.5). `AUTO_MARGIN` is in points (default 1.0) and comes from config. Search results carry `format_quantity`/`formats` (verify); if not, `disc_count` is not used for scoring. Pipeline stage `resolve`.
 
 **Tests (table-driven, synthetic candidates from JSON fixtures):**
 - Single barcode-exact hit → `auto`.

@@ -1,0 +1,60 @@
+{
+  "bxr_barcode": {
+    "id": 101,
+    "title": "Mario Più & Mauro Picotto - Imperiale",
+    "label": ["BXR Club", "Media Records GmbH"],
+    "catno": "BXRCG 003-12",
+    "barcode": ["4 036909 000014"],
+    "year": "1999",
+    "country": "Germany",
+    "format": ["Vinyl", "12\""]
+  },
+  "dekmantel_031": {
+    "id": 201,
+    "title": "Robert Hood - Paradygm Shift - Volume 1",
+    "label": ["Dekmantel"],
+    "catno": "DKMNTL 031",
+    "barcode": [],
+    "year": "2018",
+    "country": "Netherlands",
+    "format": ["Vinyl", "12\""]
+  },
+  "surgeon_2lp": {
+    "id": 301,
+    "title": "Surgeon - Basictonalvocabulary",
+    "label": ["Tresor"],
+    "catno": "TRESOR10073LP",
+    "format_quantity": 2,
+    "year": "2017",
+    "country": "Germany",
+    "format": ["Vinyl", "LP", "Album"]
+  },
+  "surgeon_3lp": {
+    "id": 302,
+    "title": "Surgeon - Basictonalvocabulary",
+    "label": ["Tresor"],
+    "catno": "TRESOR10073LP",
+    "format_quantity": 3,
+    "year": "2017",
+    "country": "Germany",
+    "format": ["Vinyl", "LP", "Album"]
+  },
+  "hood_logistic": {
+    "id": 401,
+    "title": "Robert Hood - Apartement Zero",
+    "label": ["Logistic Records"],
+    "catno": "LOG016RE",
+    "year": "2008",
+    "country": "France",
+    "format": ["Vinyl", "12\""]
+  },
+  "hood_other_catno": {
+    "id": 402,
+    "title": "Robert Hood - Apartement Zero",
+    "label": ["Logistic Records"],
+    "catno": "LOG016",
+    "year": "1999",
+    "country": "France",
+    "format": ["Vinyl", "12\""]
+  }
+}
