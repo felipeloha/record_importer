@@ -5,12 +5,29 @@ Photos of vinyl records → exact releases in your Discogs collection. See `docs
 ## Setup
 
 ```
-brew install ollama && ollama serve        # native, not Docker (Apple GPU)
+brew install uv ollama
+ollama serve                               # native, not Docker (Apple GPU); keep it running
 ollama pull qwen2.5vl:7b
-uv sync
+uv sync                                    # creates .venv/ in the repo and installs everything
 cp .env.example .env                       # fill DISCOGS_TOKEN, DISCOGS_USERNAME, DISCOGS_FOLDER_ID
 uv run crate2discogs init                  # checks token, folder, model
 ```
+
+## Python environment
+
+The project uses its own virtual environment in `.venv/`, created by `uv sync` (Python version from `.python-version`).
+
+- No activation needed: `uv run <command>` always uses `.venv/`.
+- To use the commands directly, activate it in the current shell (it must be sourced, not executed):
+
+  ```
+  source .venv/bin/activate
+  crate2discogs --help
+  deactivate                               # leave the environment
+  ```
+- If another environment is active (e.g. pyenv sets `VIRTUAL_ENV`), `uv` prints a warning and still uses `.venv/`.
+- After pulling changes to `pyproject.toml` or `uv.lock`: run `uv sync` again.
+- Configuration is read from `.env` in the current directory (or from environment variables), so run commands from the repo root.
 
 ## Use
 
