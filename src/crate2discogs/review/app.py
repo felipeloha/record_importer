@@ -170,6 +170,9 @@ def build_queue(repo: Repo) -> Queue:
     for g in all_groups:
         if g.needs_copy_question:
             q.groups.append((g, [_item(repo, photos[pid], by_photo) for pid in g.photo_ids if pid in photos]))
+    # Skipped first, then the ones Discogs couldn't find: the ones most likely worth a second look.
+    first = {"skip": 0, "not_found": 1}
+    q.decided.sort(key=lambda i: (first.get(i.resolution.outcome, 2) if i.resolution else 2, i.photo.id))
     return q
 
 

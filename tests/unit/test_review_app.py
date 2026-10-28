@@ -238,3 +238,16 @@ def test_search_box_and_links(setup: tuple[Repo, TestClient, FakeDiscogs, dict[s
     client.post(f"/photos/{ids['not_found']}/pick", data={"release_id": 555})
     res = repo.get_resolution(ids["not_found"])
     assert res is not None and (res.release_id, res.resolved_by) == (555, "user")
+
+
+def test_decided_sorted_skip_then_not_found(
+    setup: tuple[Repo, TestClient, FakeDiscogs, dict[str, int]],
+) -> None:
+    from crate2discogs.review.app import build_queue
+
+    repo, client, _, ids = setup
+    client.post(f"/photos/{ids['review']}/pick", data={"release_id": 301})  # review → picked
+    client.post(f"/photos/{ids['not_found']}/pick", data={"release_id": 77})  # not_found → picked
+    client.post(f"/photos/{ids['auto_single']}/skip")
+    order = [i.photo.id for i in build_queue(repo).decided]
+    assert order == [ids["auto_single"], ids["not_found"], ids["review"]]
