@@ -39,9 +39,12 @@ uv run crate2discogs add-to-collection     # dry run
 uv run crate2discogs add-to-collection --apply
 uv run crate2discogs status
 uv run crate2discogs export --csv out.csv
+uv run crate2discogs identify --force      # search Discogs again for everything not yet added
+uv run crate2discogs reset                 # delete DB, work copies and log; asks first
 ```
 
-- User choices in review always win; `identify --stage resolve --force` re-scores everything else (no Discogs calls).
+- User choices in review always win. `identify --force` re-searches and re-scores everything else; `identify --stage resolve --force` only re-scores (no Discogs calls).
+- `reset` keeps your photos, `.env` and code. After it, start again with `import`.
 - `copies` per release = total copies wanted in the collection; only the missing ones are added.
 
 ## Develop

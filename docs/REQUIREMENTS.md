@@ -127,9 +127,11 @@ crate2discogs add-to-collection [--apply]
 crate2discogs status
 crate2discogs export --csv <file>
 crate2discogs eval --expected <yaml>        # dev: measure accuracy on the fixture set
+crate2discogs reset [--yes]                 # delete DB, work copies and log (asks first)
 ```
 - `identify` with no `--stage` runs every non-interactive stage in order and is resumable.
 - `identify --stage resolve --force` re-scores photos from their stored candidates (no new Discogs searches), e.g. after changing `AUTO_MARGIN`. It skips user resolutions (see Conflict rule).
+- `identify --force` (or `--stage match --force`) also searches Discogs again for photos not yet added, e.g. after improving the search. Extraction is not repeated.
 - `init` checks: config is valid, `GET /oauth/identity` returns `DISCOGS_USERNAME`, `DISCOGS_FOLDER_ID` exists, and the Ollama model is pulled (if `EXTRACTOR=ollama`).
 
 Photo stages: `imported → decoded → extracted | extract_failed → matched → resolved → added`.

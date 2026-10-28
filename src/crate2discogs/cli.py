@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import Callable
 from contextlib import ExitStack
 from pathlib import Path
@@ -73,8 +74,12 @@ def import_(
     typer.echo(f"{res.new} new, {res.existing} already imported")
 
 
+def _log_path(settings: Settings) -> Path:
+    return settings.db_path.parent / "crate2discogs.log"
+
+
 def _log_to_file(settings: Settings) -> Path:
-    path = settings.db_path.parent / "crate2discogs.log"
+    path = _log_path(settings)
     handler = logging.FileHandler(path)
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
     root = logging.getLogger("crate2discogs")
@@ -191,6 +196,36 @@ def export(csv_path: Annotated[Path, typer.Option("--csv", dir_okay=False)]) -> 
     """Export one row per photo to CSV."""
     n = export_csv(_repo(_settings()), csv_path)
     typer.echo(f"wrote {n} rows to {csv_path}")
+
+
+_WORK_COPY = re.compile(r"[0-9a-f]{64}\.jpg")
+
+
+@app.command()
+def reset(
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Don't ask for confirmation")] = False,
+) -> None:
+    """Delete the database, image work copies and log to start from scratch. Photos and .env are kept."""
+    settings = _settings()
+    db = settings.db_path
+    files = [f for f in (db, Path(f"{db}-wal"), Path(f"{db}-shm"), _log_path(settings)) if f.exists()]
+    work = _work_dir(settings)
+    copies = [f for f in work.iterdir() if _WORK_COPY.fullmatch(f.name)] if work.is_dir() else []
+    if not files and not copies:
+        typer.echo("nothing to delete")
+        return
+    for f in files:
+        typer.echo(f"  {f}")
+    if copies:
+        typer.echo(f"  {work}/  ({len(copies)} image work copies)")
+    typer.echo("All decisions, review choices and cached Discogs results in the database are lost.")
+    if not yes and not typer.confirm("Delete these?"):
+        raise typer.Abort()
+    for f in [*files, *copies]:
+        f.unlink()
+    if work.is_dir() and not any(work.iterdir()):
+        work.rmdir()
+    typer.echo("done. Start again with `crate2discogs import <dir>`.")
 
 
 @app.command(name="eval")
