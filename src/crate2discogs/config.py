@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     max_edge: int = Field(default=1600, gt=0)
     auto_margin: float = Field(default=1.0, ge=0)
     query_budget: int = Field(default=12, gt=0)
-    catno_variant_cap: int = Field(default=6, ge=0)
+    catno_variant_cap: int = Field(default=2, ge=0)
     cache_ttl_days: int = Field(default=30, ge=0)
     db_path: Path = Path("./crate.db")
     user_agent: str = "crate2discogs/0.1"

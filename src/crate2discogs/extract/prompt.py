@@ -6,7 +6,7 @@ Photo types:
 - shop_sticker: a record-shop price sticker with lines ARTIST / TITLE (format hint) / Label / CATNO,
   an internal shop barcode and a short shop code such as "c3f - ic+".
 - center_label: the record's centre label (catno, label, artist, title, year).
-- back_cover: the back of the sleeve (credits, tracklist, catno, label, year, country).
+- back_cover: the back of the sleeve (credits, catno, label, year, country).
 - other: anything else, e.g. a front cover.
 
 Rules:

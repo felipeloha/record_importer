@@ -25,8 +25,8 @@ _TRANSITIONS: dict[str, set[str]] = {
     "decoded": {"extracted", "extract_failed"},
     "extract_failed": {"extracted", "extract_failed", "matched"},
     "extracted": {"matched"},
-    "matched": {"matched", "resolved"},
-    "resolved": {"matched", "resolved", "added"},
+    "matched": {"matched", "resolved", "extracted", "extract_failed"},
+    "resolved": {"matched", "resolved", "added", "extracted", "extract_failed"},
     "added": set(),
 }
 
@@ -201,6 +201,16 @@ class Repo:
         created = cur.rowcount == 1
         row = self.conn.execute("SELECT id FROM photos WHERE sha256 = ?", (sha256,)).fetchone()
         return row["id"], created
+
+    def photos_with_failed_extraction(self, limit: int | None = None) -> list[Photo]:
+        """Photos whose last extraction failed and that are not added yet (retried by identify --force)."""
+        rows = self.conn.execute(
+            "SELECT p.* FROM photos p JOIN extractions e ON e.photo_id = p.id"
+            " WHERE e.error IS NOT NULL AND p.stage IN ('extract_failed', 'matched', 'resolved')"
+            " ORDER BY p.id LIMIT ?",
+            (-1 if limit is None else limit,),
+        )
+        return [_photo(r) for r in rows]
 
     def has_sha(self, sha256: str) -> bool:
         return self.conn.execute("SELECT 1 FROM photos WHERE sha256 = ?", (sha256,)).fetchone() is not None

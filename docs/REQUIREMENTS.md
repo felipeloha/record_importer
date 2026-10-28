@@ -52,21 +52,22 @@ Every photo contains at least one strong identifier. The pipeline must handle al
   - `artist`, `title`, `label`, `catno` (exactly as printed), `catno_candidates` (list)
   - `ean_digits` (digits printed under a barcode, if legible)
   - `format_hints` (list: `"2LP"`, `"12\""`, `"Vinyl Only"`, …), `disc_count`
-  - `year`, `country`, `tracklist` (list of `{position, title}`)
+  - `year`, `country`
   - `shop_code` (captured only so it can be ignored)
   - `confidence` (0–1, model self-report, advisory only)
-- Invalid JSON gets one retry with a stricter prompt. After that, mark the photo `extract_failed` and continue.
+- Invalid JSON gets one retry with a stricter prompt. After that, mark the photo `extract_failed` and continue; `identify --force` retries it later.
+- The answer length is capped, so a model stuck in a repetition loop stops early. No tracklist is requested: nothing uses it, and it was where the model looped.
 
 ### FR-4 Discogs search cascade
 Queries run in order and stop as soon as a candidate matches on barcode, catno (exact or similar) or artist + title. More queries could only add competitors; FR-5 then decides `auto` or `review`.
 1. `barcode=<EAN>` (from the decoder, otherwise from `ean_digits` if the checksum is valid)
 2. `catno=<catno>` + `label=<label>`
-3. `artist` + `release_title`, with the title as read and cut before any parenthesis / trailing `EP`/`LP`
+3. `artist` + `release_title`, with the title cut before any parenthesis / trailing `EP`/`LP`
 4. `artist` + `label`
 5. `q="<artist> <title>"`
 6. `catno` alone and the model's alternative catnos
 7. Role-agnostic fallbacks: `release_title` alone, `track=<title>`, `artist=<label>` + `track=<title>`, `q` with all words
-8. OCR variants of the catno (capped, default 6)
+8. OCR variants of the catno (capped, default 2)
 
 - All searches use `type=release` and `format=Vinyl`.
 - Queries send the catno as printed or as an OCR variant that keeps the printed spacing and punctuation. The normalised `catno_key` is only used to compare results, never as a query.
@@ -136,7 +137,7 @@ crate2discogs reset [--yes]                 # delete DB, work copies and log (as
 ```
 - `identify` with no `--stage` runs every non-interactive stage in order and is resumable.
 - `identify --stage resolve --force` re-scores photos from their stored candidates (no new Discogs searches), e.g. after changing `AUTO_MARGIN`. It skips user resolutions (see Conflict rule).
-- `identify --force` (or `--stage match --force`) also searches Discogs again for photos not yet added, e.g. after improving the search. Extraction is not repeated.
+- `identify --force` retries failed extractions and searches Discogs again for photos not yet added, e.g. after improving the search. Successful extractions are not repeated.
 - `init` checks: config is valid, `GET /oauth/identity` returns `DISCOGS_USERNAME`, `DISCOGS_FOLDER_ID` exists, and the Ollama model is pulled (if `EXTRACTOR=ollama`).
 
 Photo stages: `imported → decoded → extracted | extract_failed → matched → resolved → added`.

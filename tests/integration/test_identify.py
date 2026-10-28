@@ -199,3 +199,32 @@ def test_retry_skipped_flow(tmp_path: Path) -> None:
     r1, r2 = repo.get_resolution(1), repo.get_resolution(2)
     assert r1 is not None and (r1.outcome, r1.release_id, r1.resolved_by) == ("auto", 201, "auto")
     assert r2 is not None and (r2.release_id, r2.resolved_by) == (999, "user")
+
+
+def test_force_retries_failed_extraction(tmp_path: Path) -> None:
+    from crate2discogs.extract.base import ExtractionFailed
+
+    repo = _repo(tmp_path, n=3)
+
+    class Flaky(FakeExtractor):
+        def extract(self, image_path: Path) -> ExtractResult:
+            if image_path.stem == "w1":
+                raise ExtractionFailed("invalid JSON after retry", raw="{ truncated")
+            return super().extract(image_path)
+
+    _run(repo, Flaky(), FakeSearch())
+    assert repo.get_photo(2).stage == "resolved"  # type: ignore[union-attr]
+    row = repo.get_extraction(2)
+    assert row is not None and row.error
+
+    plain = FakeExtractor()
+    _run(repo, plain, FakeSearch())
+    assert plain.calls == []  # without --force nothing is retried
+
+    retry = FakeExtractor()
+    _run(repo, retry, FakeSearch(), force=True)
+    assert retry.calls == [1]  # only the failed one is extracted again
+    row = repo.get_extraction(2)
+    assert row is not None and row.error is None
+    r = repo.get_resolution(2)
+    assert r is not None and (r.outcome, r.release_id) == ("auto", 301)

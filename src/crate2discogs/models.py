@@ -8,11 +8,6 @@ from crate2discogs.normalize import barcode_key, strip_format_hints
 PhotoType = Literal["ean", "shop_sticker", "center_label", "back_cover", "other"]
 
 
-class Track(BaseModel):
-    position: str | None = None
-    title: str | None = None
-
-
 class Extraction(BaseModel):
     """What the vision model read from one photo (FR-3). Every field may be null."""
 
@@ -27,7 +22,6 @@ class Extraction(BaseModel):
     disc_count: int | None = None
     year: int | None = None
     country: str | None = None
-    tracklist: list[Track] = Field(default_factory=list)
     shop_code: str | None = Field(default=None, description="Record-shop code; captured only to be ignored")
     confidence: float | None = Field(default=None, ge=0, le=1)
 

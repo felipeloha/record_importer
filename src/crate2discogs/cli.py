@@ -103,7 +103,7 @@ def identify(
         bool,
         typer.Option(
             "--force",
-            help="Redo match/resolve for photos already past them (not added ones). Keeps user choices",
+            help="Retry failed extractions; redo match/resolve for photos not added. Keeps user choices",
         ),
     ] = False,
     retry_skipped: Annotated[

@@ -26,14 +26,15 @@ def _clean(value: str | None, shop_code: str | None) -> str | None:
 
 
 def build_queries(
-    extraction: Extraction | None, barcodes: list[BarcodeRow], variant_cap: int = 6
+    extraction: Extraction | None, barcodes: list[BarcodeRow], variant_cap: int = 2
 ) -> list[dict[str, Any]]:
     """FR-4 query order. Catno queries use the printed form or its OCR variants, never catno_key."""
     e = extraction or Extraction()
     artist, title = _clean(e.artist, e.shop_code), _clean(e.title, e.shop_code)
     label, catno = _clean(e.label, e.shop_code), _clean(e.catno, e.shop_code)
 
-    titles = query_titles(title)  # as read, then without parenthesis / trailing EP
+    # Title without parenthesis / trailing EP: the version with the parenthesis almost never matches.
+    titles = query_titles(title)
     short = titles[-1] if titles else None
 
     queries: list[dict[str, Any]] = [{"barcode": ean} for ean in our_eans(extraction, barcodes)]
@@ -41,7 +42,8 @@ def build_queries(
         queries.append({"catno": catno, "label": label} if label else {"catno": catno})
     # Shop stickers often print their own catno spelling, so artist/label queries come before OCR guesses.
     if artist:
-        queries += [{"artist": artist, "release_title": t} for t in titles]
+        if short:
+            queries.append({"artist": artist, "release_title": short})
         if label:
             queries.append({"artist": artist, "label": label})
     if artist or short:
@@ -80,7 +82,7 @@ def run_search(
     extraction: Extraction | None,
     barcodes: list[BarcodeRow],
     budget: int = 12,
-    variant_cap: int = 6,
+    variant_cap: int = 2,
 ) -> SearchResult:
     """Run queries in order until a candidate matches on barcode or catno (exact or similar), or the budget
     is used.

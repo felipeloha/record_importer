@@ -25,7 +25,8 @@ class OllamaExtractor:
             "model": self.model,
             "stream": False,
             "format": self.schema,
-            "options": {"temperature": 0},
+            # A full answer is ~300 tokens; the cap stops a looping model early.
+            "options": {"temperature": 0, "num_predict": 768},
             "messages": [
                 {"role": "system", "content": PROMPT},
                 {"role": "user", "content": USER + (STRICT_SUFFIX if strict else ""), "images": [image_b64]},

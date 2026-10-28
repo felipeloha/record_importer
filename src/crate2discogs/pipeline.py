@@ -61,7 +61,18 @@ def input_stages(step: StepName, force: bool = False) -> tuple[Stage, ...]:
     return inputs[step]
 
 
+def _extract_targets(repo: Repo, force: bool, limit: int | None) -> list[Photo]:
+    photos = _select(repo, input_stages("extract"), limit)
+    if force:
+        remaining = None if limit is None else limit - len(photos)
+        if remaining is None or remaining > 0:
+            photos += repo.photos_with_failed_extraction(remaining)
+    return photos
+
+
 def pending(repo: Repo, step: StepName, force: bool = False, limit: int | None = None) -> int:
+    if step == "extract":
+        return len(_extract_targets(repo, force, limit))
     return len(_select(repo, input_stages(step, force), limit))
 
 
@@ -91,15 +102,16 @@ def run_extract(
     always_extract: bool = True,
     limit: int | None = None,
     tick: Tick = _noop,
+    force: bool = False,
 ) -> int:
-    """Run the vision extractor on photos at `decoded`.
+    """Run the vision extractor on photos at `decoded`; with `force` also retry failed extractions.
 
     Every photo is extracted, so a barcode unknown to Discogs still has text to fall back on.
     `always_extract=False` skips photos with a valid EAN (faster, no fallback).
     ExtractionFailed → stage extract_failed; ExtractorUnavailable and other errors stop the stage.
     """
     done = 0
-    for photo in _select(repo, input_stages("extract"), limit):
+    for photo in _extract_targets(repo, force, limit):
         if not always_extract and valid_eans(repo.get_barcodes(photo.id)):
             repo.set_stage(photo.id, "extracted")
             log.info("extract photo=%s skipped=valid_ean", photo.id)
@@ -135,7 +147,7 @@ def run_match(
     repo: Repo,
     search: Search,
     budget: int = 12,
-    variant_cap: int = 6,
+    variant_cap: int = 2,
     limit: int | None = None,
     tick: Tick = _noop,
     force: bool = False,
@@ -200,7 +212,7 @@ def identify(
     search: Callable[[], Search],
     margin: float,
     budget: int = 12,
-    variant_cap: int = 6,
+    variant_cap: int = 2,
     step: StepName | None = None,
     limit: int | None = None,
     always_extract: bool = True,
@@ -223,7 +235,7 @@ def identify(
         if name == "decode":
             done[name] = run_decode(repo, limit, decoder, tick)
         elif name == "extract":
-            done[name] = run_extract(repo, extractor(), always_extract, limit, tick)
+            done[name] = run_extract(repo, extractor(), always_extract, limit, tick, force)
         elif name == "match":
             done[name] = run_match(repo, search(), budget, variant_cap, limit, tick, force)
         else:

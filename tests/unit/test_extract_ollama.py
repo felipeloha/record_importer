@@ -57,8 +57,7 @@ def test_schema_has_no_refs_and_requires_every_field() -> None:
     schema = extraction_schema()
     assert "$ref" not in json.dumps(schema)
     assert set(schema["required"]) == set(Extraction.model_fields)
-    track = schema["properties"]["tracklist"]["items"]
-    assert set(track["required"]) == {"position", "title"}
+    assert "tracklist" not in schema["properties"]  # long, unused, and where the model looped
 
 
 def test_postprocess_cleans_hints_and_country() -> None:
