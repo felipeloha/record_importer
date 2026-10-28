@@ -18,6 +18,12 @@ FIX = json.loads((Path(__file__).parents[1] / "fixtures" / "discogs" / "search_c
 class FakeDiscogs:
     def __init__(self) -> None:
         self.calls: list[int] = []
+        self.searches: list[dict[str, Any]] = []
+        self.search_results: list[dict[str, Any]] = []
+
+    def search(self, **params: Any) -> dict[str, Any]:
+        self.searches.append(params)
+        return {"results": self.search_results}
 
     def release(self, release_id: int) -> dict[str, Any]:
         self.calls.append(release_id)
@@ -37,7 +43,11 @@ def _photo(
     repo.save_extraction(
         pid,
         ExtractionRow(
-            "fake", "m", None, Extraction(catno=catno or f"CAT{i}", artist="Artist").model_dump_json(), None
+            "fake",
+            "m",
+            None,
+            Extraction(catno=catno or f"CAT{i}", artist="Artist", label="Dekmantel").model_dump_json(),
+            None,
         ),
     )
     repo.replace_candidates(
@@ -212,3 +222,19 @@ def test_parallel_requests_share_db_safely(
     with ThreadPoolExecutor(max_workers=16) as pool:
         codes = list(pool.map(lambda u: client.get(u).status_code, urls))
     assert set(codes) == {200}
+
+
+def test_search_box_and_links(setup: tuple[Repo, TestClient, FakeDiscogs, dict[str, int]]) -> None:
+    repo, client, fake, ids = setup
+    fake.search_results = [
+        {"id": 555, "title": "Sound Stream - Bass Affairs", "label": ["Sound Stream"], "catno": "SST 07"}
+    ]
+    html = client.get(f"/photos/{ids['not_found']}").text
+    assert "https://www.google.com/search?q=discogs+Artist+CAT2" in html
+    assert 'name="q"' in html
+    html = client.get(f"/photos/{ids['not_found']}", params={"q": "sound stream bass affairs"}).text
+    assert fake.searches == [{"q": "sound stream bass affairs", "type": "release", "per_page": 10}]
+    assert "Sound Stream – Bass Affairs" in html
+    client.post(f"/photos/{ids['not_found']}/pick", data={"release_id": 555})
+    res = repo.get_resolution(ids["not_found"])
+    assert res is not None and (res.release_id, res.resolved_by) == (555, "user")

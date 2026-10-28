@@ -65,6 +65,33 @@
 
     {% if item.editable %}
     <div class="box" style="margin-top:16px">
+      <form method="get" action="/photos/{{ item.photo.id }}">
+        <label>Search Discogs: <input type="text" name="q" size="48" value="{{ query }}"></label>
+        <button type="submit">Search</button>
+        <span class="muted">or open
+          <a href="{{ google_url }}" target="_blank" rel="noopener">Google</a> ·
+          <a href="{{ discogs_url }}" target="_blank" rel="noopener">Discogs</a></span>
+      </form>
+      {% if results is not none %}
+        {% if results %}
+        <table style="margin-top:8px">
+          {% for c in results %}
+          <tr>
+            <td>{% if c.thumb %}<img class="thumb" src="{{ c.thumb }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}</td>
+            <td><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.artist }} – {{ c.title }}</a></td>
+            <td>{{ c.label }}<br><span class="muted">{{ c.catno }}</span></td>
+            <td>{{ c.year }}<br><span class="muted">{{ c.country }}</span></td>
+            <td>{{ c.format }}</td>
+            <td><form class="inline" method="post" action="/photos/{{ item.photo.id }}/pick">
+              <input type="hidden" name="release_id" value="{{ c.release_id }}">
+              <button class="primary" type="submit">This one</button></form></td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% else %}<p class="muted">No results.</p>{% endif %}
+      {% endif %}
+    </div>
+    <div class="box">
       <form method="post" action="/photos/{{ item.photo.id }}/paste">
         <label>Paste a Discogs release URL or ID:
           <input type="text" name="value" size="48" placeholder="https://www.discogs.com/release/123456-…" required>

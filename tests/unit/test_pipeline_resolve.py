@@ -22,7 +22,7 @@ def _matched(repo: Repo, i: int, extraction: Extraction, cands: list[str]) -> in
 def test_resolve_auto_and_review(tmp_path: Path) -> None:
     repo = Repo(connect(tmp_path / "t.db"))
     a = _matched(repo, 1, Extraction(catno="DKMNTL 031", label="Dekmantel"), ["dekmantel_031"])
-    b = _matched(repo, 2, Extraction(catno="TRESOR10073LP"), ["surgeon_3lp", "surgeon_2lp"])
+    b = _matched(repo, 2, Extraction(catno="TRESOR10073LP", label="Tresor"), ["surgeon_3lp", "surgeon_2lp"])
     c = _matched(repo, 3, Extraction(catno="NOPE"), [])
     assert run_resolve(repo, margin=1.0) == 3
     ra, rb, rc = (repo.get_resolution(x) for x in (a, b, c))
@@ -36,8 +36,18 @@ def test_resolve_auto_and_review(tmp_path: Path) -> None:
 
 def test_force_rescores_without_touching_user_choice(tmp_path: Path) -> None:
     repo = Repo(connect(tmp_path / "t.db"))
-    a = _matched(repo, 1, Extraction(catno="TRESOR10073LP", disc_count=2), ["surgeon_3lp", "surgeon_2lp"])
-    b = _matched(repo, 2, Extraction(catno="TRESOR10073LP", disc_count=2), ["surgeon_3lp", "surgeon_2lp"])
+    a = _matched(
+        repo,
+        1,
+        Extraction(catno="TRESOR10073LP", label="Tresor", disc_count=2),
+        ["surgeon_3lp", "surgeon_2lp"],
+    )
+    b = _matched(
+        repo,
+        2,
+        Extraction(catno="TRESOR10073LP", label="Tresor", disc_count=2),
+        ["surgeon_3lp", "surgeon_2lp"],
+    )
     run_resolve(repo, margin=1.0)
     ra = repo.get_resolution(a)
     assert ra is not None and ra.outcome == "auto"

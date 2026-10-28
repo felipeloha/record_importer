@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Any, ParamSpec, Protocol, TypeVar
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -15,6 +16,7 @@ from crate2discogs.db import Photo, Repo, ResolutionRow
 from crate2discogs.dedupe import Group, groups
 from crate2discogs.discogs import DiscogsError, DiscogsNotFound
 from crate2discogs.models import Extraction
+from crate2discogs.normalize import query_titles
 from crate2discogs.pipeline import load_extraction, resolve_photo
 from crate2discogs.scoring import candidate_artist_title, candidate_catnos, candidate_labels
 
@@ -29,6 +31,15 @@ _RELEASE_URL = re.compile(r"discogs\.com/(?:[a-z]{2}/)?release/(\d+)", re.IGNORE
 
 class ReleaseLookup(Protocol):
     def release(self, release_id: int) -> dict[str, Any]: ...
+    def search(self, **params: Any) -> dict[str, Any]: ...
+
+
+def search_text(e: Extraction | None) -> str:
+    """Default text for the manual search box and the Google/Discogs links."""
+    if e is None:
+        return ""
+    title = query_titles(e.title)[-1] if e.title else None
+    return " ".join(x for x in (e.artist, title, e.catno) if x)
 
 
 class InvalidReleaseInput(ValueError):
@@ -196,7 +207,7 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
         return f"/photos/{later[0]}" if later else "/"
 
     def render_photo(
-        request: Request, photo: Photo, error: str | None = None, status: int = 200
+        request: Request, photo: Photo, error: str | None = None, status: int = 200, q: str | None = None
     ) -> HTMLResponse:
         by_photo = {pid: g for g in groups(repo) for pid in g.photo_ids}
         item = _item(repo, photo, by_photo, with_candidates=True)
@@ -210,10 +221,29 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
                 except DiscogsError:
                     chosen = None
         barcodes = repo.get_barcodes(photo.id)
+        query = search_text(item.extraction)
+        results: list[CandidateView] | None = None
+        if q is not None and q.strip():
+            query = q.strip()
+            try:
+                found = discogs.search(q=query, type="release", per_page=10).get("results", [])
+                results = [candidate_view(r) for r in found]
+            except DiscogsError as e:
+                error = f"Discogs search failed: {e}"
         return TEMPLATES.TemplateResponse(
             request,
             "photo.html",
-            {"item": item, "chosen": chosen, "barcodes": barcodes, "error": error},
+            {
+                "item": item,
+                "chosen": chosen,
+                "barcodes": barcodes,
+                "error": error,
+                "query": query,
+                "results": results,
+                "google_url": "https://www.google.com/search?" + urlencode({"q": f"discogs {query}"}),
+                "discogs_url": "https://www.discogs.com/search/?"
+                + urlencode({"q": query, "type": "release"}),
+            },
             status_code=status,
         )
 
@@ -232,8 +262,8 @@ def create_app(repo: Repo, discogs: ReleaseLookup, margin: float) -> FastAPI:
 
     @app.get("/photos/{photo_id}", response_class=HTMLResponse)
     @serialised
-    def photo_page(request: Request, photo_id: int) -> HTMLResponse:
-        return render_photo(request, photo_or_404(photo_id))
+    def photo_page(request: Request, photo_id: int, q: str | None = None) -> HTMLResponse:
+        return render_photo(request, photo_or_404(photo_id), q=q)
 
     def _save_user(photo: Photo, outcome: str | None, release_id: int | None) -> None:
         prev = repo.get_resolution(photo.id)

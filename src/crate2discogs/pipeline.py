@@ -88,13 +88,14 @@ def run_decode(repo: Repo, limit: int | None = None, decoder: Decoder = decode, 
 def run_extract(
     repo: Repo,
     extractor: Extractor,
-    always_extract: bool = False,
+    always_extract: bool = True,
     limit: int | None = None,
     tick: Tick = _noop,
 ) -> int:
     """Run the vision extractor on photos at `decoded`.
 
-    Photos with a valid EAN are skipped (no extraction row) unless `always_extract`.
+    Every photo is extracted, so a barcode unknown to Discogs still has text to fall back on.
+    `always_extract=False` skips photos with a valid EAN (faster, no fallback).
     ExtractionFailed → stage extract_failed; ExtractorUnavailable and other errors stop the stage.
     """
     done = 0
@@ -133,7 +134,7 @@ def run_extract(
 def run_match(
     repo: Repo,
     search: Search,
-    budget: int = 8,
+    budget: int = 12,
     variant_cap: int = 6,
     limit: int | None = None,
     tick: Tick = _noop,
@@ -198,11 +199,11 @@ def identify(
     extractor: Callable[[], Extractor],
     search: Callable[[], Search],
     margin: float,
-    budget: int = 8,
+    budget: int = 12,
     variant_cap: int = 6,
     step: StepName | None = None,
     limit: int | None = None,
-    always_extract: bool = False,
+    always_extract: bool = True,
     force: bool = False,
     decoder: Decoder = decode,
     progress: Callable[[StepName, int], Tick] | None = None,

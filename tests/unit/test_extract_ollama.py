@@ -159,20 +159,20 @@ def test_pipeline_failed_photo_marked_and_others_continue(tmp_path: Path) -> Non
     assert Extraction.model_validate_json(ok.parsed_json).catno == "X1"
 
 
-def test_pipeline_skips_valid_ean_unless_always_extract(tmp_path: Path) -> None:
+def test_pipeline_extracts_ean_photos_by_default(tmp_path: Path) -> None:
     ean = [BarcodeRow("EAN13", "4036909000014", True)]
     shop = [BarcodeRow("Code93", "BW7/J6", False)]
     repo = _decoded_repo(tmp_path, {0: ean, 1: shop}, n=2)
     fake = FakeExtractor()
     run_extract(repo, fake)
-    assert [p.name for p in fake.calls] == ["w1.jpg"]
-    assert all(p.stage == "extracted" for p in repo.all_photos())
+    assert [p.name for p in fake.calls] == ["w0.jpg", "w1.jpg"]
 
     (tmp_path / "b").mkdir()
-    repo2 = _decoded_repo(tmp_path / "b", {0: ean}, n=1)
+    repo2 = _decoded_repo(tmp_path / "b", {0: ean, 1: shop}, n=2)
     fake2 = FakeExtractor()
-    run_extract(repo2, fake2, always_extract=True)
-    assert len(fake2.calls) == 1
+    run_extract(repo2, fake2, always_extract=False)  # --skip-ean-photos
+    assert [p.name for p in fake2.calls] == ["w1.jpg"]
+    assert all(p.stage == "extracted" for p in repo2.all_photos())
 
 
 def test_pipeline_stops_when_extractor_unavailable(tmp_path: Path) -> None:

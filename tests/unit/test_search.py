@@ -72,7 +72,30 @@ def test_only_artist_title() -> None:
     assert qs == [
         {"artist": "Robert Hood", "release_title": "Paradygm Shift"},
         {"q": "Robert Hood Paradygm Shift"},
+        {"release_title": "Paradygm Shift"},
+        {"track": "Paradygm Shift"},
     ]
+
+
+def test_title_variants_and_role_fallbacks() -> None:
+    e = Extraction(
+        artist="Moodymann", title="I CANT KICK THIS FEELIN WHEN IT HITS (C Decks Reworx", label="Decks"
+    )
+    qs = [_strip(q) for q in build_queries(e, [])]
+    assert {"artist": "Moodymann", "release_title": "I CANT KICK THIS FEELIN WHEN IT HITS"} in qs
+    assert {"release_title": "I CANT KICK THIS FEELIN WHEN IT HITS"} in qs
+    assert {"track": "I CANT KICK THIS FEELIN WHEN IT HITS"} in qs
+    assert {"artist": "Decks", "track": "I CANT KICK THIS FEELIN WHEN IT HITS"} in qs
+
+
+def test_trailing_ep_not_searched() -> None:
+    from crate2discogs.models import postprocess
+
+    e = postprocess(
+        Extraction(artist="MATTHIAS MEYER", title="MORE OR LESS EP", label="Cecille", catno="CEC0216")
+    )
+    qs = [_strip(q) for q in build_queries(e, [])]
+    assert qs[1] == {"artist": "MATTHIAS MEYER", "release_title": "MORE OR LESS"}
 
 
 def test_budget_respected() -> None:

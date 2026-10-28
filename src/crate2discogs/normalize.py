@@ -13,6 +13,7 @@ _HINT_PATTERNS = [
     re.compile(r"^(?:EP|LTD\.?|LIMITED(?: EDITION)?|REPRESS|180\s*G(?:RAM)?|COLOU?RED(?: VINYL)?)$"),
 ]
 _TRAILING_GROUP = re.compile(r"\s*[(\[]([^()\[\]]*)[)\]]\s*$")
+_TRAILING_WORD = re.compile(r'\s+((\d*)\s*X?\s*LP|EP|(?:12|10|7)")\s*$', re.IGNORECASE)
 _UPPER_HINT = re.compile(r'^[\dX\s]*(?:LP|EP|G|"|12|10|7)$')
 
 
@@ -84,7 +85,28 @@ def strip_format_hints(title: str | None) -> tuple[str | None, list[str], int | 
         if matched.groups() and matched.group(1):
             discs = int(matched.group(1))
         clean = clean[: m.start()]
+    # Bare trailing hints without parentheses: "MORE OR LESS EP", "PARADYGM SHIFT 2LP".
+    while (m := _TRAILING_WORD.search(clean)) and clean[: m.start()].strip():
+        content = re.sub(r"\s+", " ", m.group(1).strip().upper())
+        hints.insert(0, _canonical_hint(content))
+        if m.group(2):
+            discs = int(m.group(2))
+        clean = clean[: m.start()]
     return clean.strip(), hints, discs
+
+
+def query_titles(title: str | None) -> list[str]:
+    """Titles to search with: as read, then cut before any parenthesis (also unclosed ones).
+
+    'I CANT KICK THIS FEELIN WHEN IT HITS (C Decks Reworx' → also 'I CANT KICK THIS FEELIN WHEN IT HITS'.
+    """
+    if not title or not title.strip():
+        return []
+    out = [title.strip()]
+    cut, _, _ = strip_format_hints(re.split(r"\s*[(\[]", title, maxsplit=1)[0])
+    if cut and cut not in out:
+        out.append(cut)
+    return out
 
 
 def text_key(s: str | None) -> str:

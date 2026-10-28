@@ -7,7 +7,14 @@ from rapidfuzz import fuzz
 from crate2discogs.barcodes import ean_checksum_valid, valid_eans
 from crate2discogs.db import BarcodeRow
 from crate2discogs.models import Extraction
-from crate2discogs.normalize import barcode_key, catno_key, catno_similar, catno_variants, text_key
+from crate2discogs.normalize import (
+    barcode_key,
+    catno_key,
+    catno_similar,
+    catno_variants,
+    query_titles,
+    text_key,
+)
 
 # Points per matching field. The score only ranks candidates; the outcome rules are in `resolve`.
 WEIGHTS: dict[str, float] = {
@@ -37,8 +44,9 @@ class Scored:
 
     @property
     def found(self) -> bool:
-        """Identified by barcode or catno (exact or similar): the search can stop."""
-        return self.hard_match or "catno_similar" in self.matched
+        """Identified by barcode, catno (exact or similar) or artist + title: the search can stop."""
+        m = self.matched
+        return self.hard_match or "catno_similar" in m or ("artist" in m and "title" in m)
 
 
 @dataclass(frozen=True)
@@ -128,16 +136,23 @@ def score(candidate: dict[str, Any], extraction: Extraction | None, barcodes: li
         matched.append("barcode")
     theirs = candidate_catnos(candidate)
     if catno_keys(extraction) & {catno_key(c) for c in theirs}:
-        matched.append("catno")
+        catno_match: str | None = "catno"
     elif e.catno and any(catno_similar(e.catno, c) for c in theirs):
-        matched.append("catno_similar")
+        catno_match = "catno_similar"
+    else:
+        catno_match = None
     artist, title = candidate_artist_title(candidate)
-    if _fuzzy(e.artist, [artist]):
+    # Our label matching their artist covers swapped roles (artist printed as label on a centre label).
+    if _fuzzy(e.artist, [artist]) or _fuzzy(e.label, [artist]):
         matched.append("artist")
-    if _fuzzy(e.title, [title]):
+    if any(_fuzzy(t, [title]) for t in query_titles(e.title)):
         matched.append("title")
     if _fuzzy(e.label, candidate_labels(candidate)):
         matched.append("label")
+    # A catno only counts when the label, artist or title agrees: bare numbers like "72697" exist on
+    # many unrelated releases.
+    if catno_match and {"artist", "title", "label"} & set(matched):
+        matched.insert(1 if "barcode" in matched else 0, catno_match)
     if e.disc_count is not None and e.disc_count == candidate_disc_count(candidate):
         matched.append("disc_count")
     if e.year is not None and str(e.year) == str(candidate.get("year", "")):

@@ -85,7 +85,7 @@ def test_no_candidates_not_found() -> None:
 
 
 def test_duplicate_release_from_two_queries_counted_once() -> None:
-    e = Extraction(catno="DKMNTL 031")
+    e = Extraction(catno="DKMNTL 031", label="Dekmantel")
     ranked = rank([(_c("dekmantel_031"), {"catno": "a"}), (_c("dekmantel_031"), {"catno": "b"})], e, [])
     assert len(ranked) == 1
     assert resolve(ranked, MARGIN).outcome == "auto"
@@ -94,14 +94,14 @@ def test_duplicate_release_from_two_queries_counted_once() -> None:
 @pytest.mark.parametrize("extra", list(WEIGHTS))
 def test_monotonic_adding_matching_field_never_lowers(extra: str) -> None:
     cand = _c("bxr_barcode")
-    base = Extraction()
+    base = Extraction(label="BXR Club")  # a catno only counts with a confirming field
     fields: dict[str, Any] = {
         "barcode": {"ean_digits": "4036909000014"},
         "catno": {"catno": "BXRCG 003-12"},
         "catno_similar": {"catno": "BXRCG 312"},
         "artist": {"artist": "Mario Piu & Mauro Picotto"},
         "title": {"title": "Imperiale"},
-        "label": {"label": "BXR Club"},
+        "label": {"label": "BXR Club"},  # already in base
         "disc_count": {"disc_count": None},
         "year": {"year": 1999},
         "country": {"country": "Germany"},
@@ -109,7 +109,7 @@ def test_monotonic_adding_matching_field_never_lowers(extra: str) -> None:
     before = score(cand, base, []).score
     after = score(cand, base.model_copy(update=fields[extra]), []).score
     assert after >= before
-    if extra != "disc_count":
+    if extra not in ("disc_count", "label"):
         assert after > before
 
 
@@ -126,7 +126,7 @@ def test_regression_catno_differs_never_auto() -> None:
     [("Perlon100", "PERL100"), ("TRESOR10073LP", "Tresor. 10073"), ("LOG016RE", "log 16")],
 )
 def test_shop_catno_similar_found_but_never_auto(ours: str, theirs: str) -> None:
-    s = score(_c("dekmantel_031", catno=theirs), Extraction(catno=ours), [])
+    s = score(_c("dekmantel_031", catno=theirs), Extraction(catno=ours, label="Dekmantel"), [])
     assert "catno_similar" in s.matched
     assert s.found and not s.hard_match
     assert resolve([s], MARGIN).outcome == "review"
@@ -135,6 +135,13 @@ def test_shop_catno_similar_found_but_never_auto(ours: str, theirs: str) -> None
 def test_title_without_spaces_matches() -> None:
     cand = _c("surgeon_2lp")
     assert "title" in score(cand, Extraction(title="BASIC TIONAL VOCABULARY"), []).matched
+
+
+def test_catno_alone_does_not_count() -> None:
+    cand = _c("dekmantel_031", title="Dave Dudley - Trucker's Prayer", label=["Mercury"], catno="72697")
+    s = score(cand, Extraction(artist="SOUNDSTREAM", title="BASS AFFAIRS", catno="72697"), [])
+    assert s.matched == ()
+    assert not s.found
 
 
 def test_label_suffix_and_case_ignored() -> None:

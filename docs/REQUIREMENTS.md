@@ -41,7 +41,7 @@ Every photo contains at least one strong identifier. The pipeline must handle al
 ### FR-2 Barcode decoding (local, deterministic)
 - Decode barcodes locally before any AI call, on the full-resolution original with EXIF orientation applied (downscaling loses barcode detail).
 - Accept only the symbologies and checksum rule from R-1.
-- If a valid EAN/UPC is found, the vision step is optional for that photo (configurable: `--always-extract`).
+- Every photo also goes through the vision step, so a barcode unknown to Discogs still has text to fall back on. `--skip-ean-photos` skips photos with a valid EAN (faster, no fallback).
 
 ### FR-3 Vision extraction
 - A pluggable `Extractor` interface with two implementations:
@@ -58,27 +58,31 @@ Every photo contains at least one strong identifier. The pipeline must handle al
 - Invalid JSON gets one retry with a stricter prompt. After that, mark the photo `extract_failed` and continue.
 
 ### FR-4 Discogs search cascade
-Queries run in order and stop as soon as any candidate matches on barcode or catno (incl. OCR variants). More queries could only add competitors; FR-5 then decides `auto` or `review`.
+Queries run in order and stop as soon as a candidate matches on barcode, catno (exact or similar) or artist + title. More queries could only add competitors; FR-5 then decides `auto` or `review`.
 1. `barcode=<EAN>` (from the decoder, otherwise from `ean_digits` if the checksum is valid)
 2. `catno=<catno>` + `label=<label>`
-3. `catno=<variant>` for each catno variant (capped, default 6)
-4. `artist=<artist>` + `release_title=<title>` (+ `label` if known)
-5. `q="<artist> <title>"` as a last resort
+3. `artist` + `release_title`, with the title as read and cut before any parenthesis / trailing `EP`/`LP`
+4. `artist` + `label`
+5. `q="<artist> <title>"`
+6. `catno` alone and the model's alternative catnos
+7. Role-agnostic fallbacks: `release_title` alone, `track=<title>`, `artist=<label>` + `track=<title>`, `q` with all words
+8. OCR variants of the catno (capped, default 6)
 
 - All searches use `type=release` and `format=Vinyl`.
-- Queries send the catno as printed (step 2) or as an OCR variant that keeps the printed spacing and punctuation (step 3). The normalised `catno_key` is only used to compare results, never as a query.
-- Per-photo query budget: default 8 Discogs calls.
+- Queries send the catno as printed or as an OCR variant that keeps the printed spacing and punctuation. The normalised `catno_key` is only used to compare results, never as a query.
+- Shop stickers often print their own catno spelling (`Perlon100` for `PERL100`), so artist and label queries come before OCR guesses.
+- Per-photo query budget: default 12 Discogs calls.
 
 ### FR-5 Scoring and outcome
 Each candidate gets a score: the sum of points for each field that matches. The score only ranks candidates:
 - barcode exact match (strongest; Discogs barcodes are compared digits-only)
-- normalised catno exact match
+- normalised catno exact match (4) or similar catno (3: same number, one letter prefix starts with the other: `Perlon100` ≈ `PERL100`). A catno only counts when the label, artist or title also matches.
 - label match (fuzzy)
-- artist and title match (fuzzy, accent- and case-insensitive)
+- artist and title match (fuzzy, accent-, case- and space-insensitive; our label may match their artist)
 - `disc_count` vs Discogs format quantity, year, country (tie-breakers)
 
 Outcome per photo, decided by two rules:
-- `auto`: the top candidate **(a)** matches on barcode or normalised catno, **and (b)** is ahead of the runner-up by at least `AUTO_MARGIN` (or there is no runner-up). Both must hold.
+- `auto`: the top candidate **(a)** matches on barcode or exact normalised catno, **and (b)** is ahead of the runner-up by at least `AUTO_MARGIN` (or there is no runner-up). Both must hold.
 - `review`: candidates exist but the top one fails (a) or (b). Typical cases: several pressings share the barcode or catno, or only artist/title matched.
 - `not_found`: no candidates.
 - `skip`: set only by the user in review.
@@ -96,6 +100,7 @@ Outcome per photo, decided by two rules:
   - every `review` and `not_found` photo
   - every group with more than one photo, even if `auto`, with the question "same record photographed twice, or N copies?"
 - Each item shows: the photo, the extracted fields, and the top 3 candidates (thumbnail, artist – title, label, catno, year, country, format, link to Discogs).
+- A search box runs a Discogs search from the page (results can be picked directly), plus links to the same search on Google and Discogs.
 - Actions: pick a candidate, paste a Discogs release ID or URL (validated against the API; `/master/` URLs are rejected), mark as skip, set `copies`, undo my choice (back to the automatic result).
 - Auto-accepted single photos are listed in a collapsed section and can be overridden.
 - Choices persist immediately (closing the browser loses nothing).

@@ -1,0 +1,50 @@
+# Real photos the first version failed on. Ground truth read from the photos; release IDs checked on Discogs.
+- file: fails/image (1).jpeg
+  photo_type: center_label
+  artist: Ian Pooley
+  title: Loopduell 1
+  label: null
+  catno: null
+  ean: "4014235261811"  # printed, but not on Discogs
+  disc_count: null
+  expected_release_id: 20871  # FIM 137; 2857319 is the white-label promo
+
+- file: fails/image (2).jpeg
+  photo_type: shop_sticker
+  artist: Matthias Meyer
+  title: More Or Less
+  label: Cecille
+  catno: CEC0216  # as printed; Discogs: CEC021
+  ean: null
+  disc_count: null
+  expected_release_id: 2870797
+
+- file: fails/image (3).jpeg
+  photo_type: shop_sticker
+  artist: Moodymann
+  title: I Cant Kick This Feelin When It Hits
+  label: Decks Reworx
+  catno: Drworx001
+  ean: null
+  disc_count: null
+  expected_release_id: 2750263
+
+- file: fails/image (4).jpeg
+  photo_type: shop_sticker
+  artist: Times Are Ruf  # as printed; Discogs: Times Are Ruff
+  title: Got Five On It
+  label: Times Are Ruf
+  catno: TAR007
+  ean: null
+  disc_count: null
+  expected_release_id: 6282041
+
+- file: fails/image.jpeg
+  photo_type: shop_sticker
+  artist: Soundstream  # as printed; Discogs: Sound Stream
+  title: Bass Affairs
+  label: Soundstream
+  catno: Soundstream 07  # as printed; Discogs: SST 07
+  ean: null
+  disc_count: null
+  expected_release_id: 6824131  # 2015; 29117761 is the 2023 reissue

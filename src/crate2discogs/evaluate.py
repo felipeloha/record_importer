@@ -14,7 +14,7 @@ from crate2discogs.extract.base import Extractor, ExtractResult
 from crate2discogs.importer import import_file
 from crate2discogs.models import Extraction, PhotoType
 from crate2discogs.normalize import barcode_key, catno_key, text_key
-from crate2discogs.pipeline import run_decode, run_extract, run_match, run_resolve
+from crate2discogs.pipeline import load_extraction, run_decode, run_extract, run_match, run_resolve
 from crate2discogs.search import Search
 
 FIELDS = ("photo_type", "artist", "title", "label", "catno", "ean", "disc_count")
@@ -170,7 +170,7 @@ def run_eval(
     max_edge: int,
     search: Search | None = None,
     margin: float = 1.0,
-    budget: int = 8,
+    budget: int = 12,
 ) -> EvalReport:
     """Import, decode and extract the fixture photos (cached in `repo`), then score per field.
 
@@ -181,14 +181,14 @@ def run_eval(
     run_decode(repo)
     run_extract(repo, timed, always_extract=True)
     if search is not None:
-        run_match(repo, search, budget)
+        run_match(repo, search, budget, force=True)  # always evaluate the current search code
         run_resolve(repo, margin, force=True)
 
     photos: list[PhotoEval] = []
     for e in entries:
         pid = ids[e.file]
         row = repo.get_extraction(pid)
-        extraction = Extraction.model_validate_json(row.parsed_json) if row and row.parsed_json else None
+        extraction = load_extraction(repo, pid)
         predicted = predicted_fields(extraction, repo.get_barcodes(pid))
         expected = e.model_dump(include=set(FIELDS))
         res = repo.get_resolution(pid)

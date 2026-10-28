@@ -9,7 +9,7 @@
   catno: Perlon100
   ean: null
   disc_count: null
-  expected_release_id: null
+  expected_release_id: 5807306  # confirmed by owner
 
 - file: photos/58dae532-d9f3-4907-911c-c296da8f99b8.webp
   photo_type: center_label
@@ -39,7 +39,7 @@
   catno: TRESOR10073LP
   ean: null
   disc_count: 2
-  expected_release_id: null
+  expected_release_id: 6428870  # confirmed by owner
 
 - file: photos/d2e01ef6-03d6-483b-8adf-55a5c8ba5f4c.webp
   photo_type: shop_sticker
@@ -49,7 +49,7 @@
   catno: TRESOR10073LP
   ean: null
   disc_count: 2
-  expected_release_id: null
+  expected_release_id: 6428870  # confirmed by owner
   duplicate_of: photos/c761c01c-3545-4c1c-bfb8-bd5a53ac2b33.webp
 
 - file: photos/28213b64-65c1-4f0e-9203-9c6d835778ca.webp

@@ -5,7 +5,7 @@ from typing import Any
 
 from crate2discogs.db import BarcodeRow
 from crate2discogs.models import Extraction
-from crate2discogs.normalize import catno_variants
+from crate2discogs.normalize import catno_variants, query_titles
 from crate2discogs.scoring import our_eans, rank
 
 BASE_PARAMS = {"type": "release", "format": "Vinyl", "per_page": 25}
@@ -33,22 +33,33 @@ def build_queries(
     artist, title = _clean(e.artist, e.shop_code), _clean(e.title, e.shop_code)
     label, catno = _clean(e.label, e.shop_code), _clean(e.catno, e.shop_code)
 
+    titles = query_titles(title)  # as read, then without parenthesis / trailing EP
+    short = titles[-1] if titles else None
+
     queries: list[dict[str, Any]] = [{"barcode": ean} for ean in our_eans(extraction, barcodes)]
     if catno:
         queries.append({"catno": catno, "label": label} if label else {"catno": catno})
     # Shop stickers often print their own catno spelling, so artist/label queries come before OCR guesses.
-    if artist and title:
-        queries.append({"artist": artist, "release_title": title})
-    if artist and label:
-        queries.append({"artist": artist, "label": label})
-    if artist or title:
-        queries.append({"q": " ".join(x for x in (artist, title) if x)})
+    if artist:
+        queries += [{"artist": artist, "release_title": t} for t in titles]
+        if label:
+            queries.append({"artist": artist, "label": label})
+    if artist or short:
+        queries.append({"q": " ".join(x for x in (artist, short) if x)})
     if catno:
         if label:
             queries.append({"catno": catno})
-        alternatives = [c for c in (_clean(x, e.shop_code) for x in e.catno_candidates) if c]
-        for v in [*alternatives, *catno_variants(catno, cap=variant_cap)]:
-            queries.append({"catno": v})
+        queries += [{"catno": c} for c in (_clean(x, e.shop_code) for x in e.catno_candidates) if c]
+    # Role-agnostic fallbacks: artist spelled differently, title is really a track, label is the artist.
+    if short:
+        queries.append({"release_title": short})
+        queries.append({"track": short})
+        if label:
+            queries.append({"artist": label, "track": short})
+    if artist or short:
+        queries.append({"q": " ".join(x for x in (artist, short, label) if x)})
+    if catno:
+        queries += [{"catno": v} for v in catno_variants(catno, cap=variant_cap)]
 
     out: list[dict[str, Any]] = []
     for q in queries:
@@ -68,7 +79,7 @@ def run_search(
     search: Search,
     extraction: Extraction | None,
     barcodes: list[BarcodeRow],
-    budget: int = 8,
+    budget: int = 12,
     variant_cap: int = 6,
 ) -> SearchResult:
     """Run queries in order until a candidate matches on barcode or catno (exact or similar), or the budget

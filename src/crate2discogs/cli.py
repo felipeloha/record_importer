@@ -92,7 +92,13 @@ def _log_to_file(settings: Settings) -> Path:
 def identify(
     stage: Annotated[StepName | None, typer.Option("--stage", help="Run only this step")] = None,
     limit: Annotated[int | None, typer.Option("--limit", min=1, help="Max photos per step")] = None,
-    always_extract: Annotated[bool, typer.Option("--always-extract")] = False,
+    skip_ean_photos: Annotated[
+        bool,
+        typer.Option(
+            "--skip-ean-photos",
+            help="Don't run the vision model on photos with a valid EAN (faster, but no fallback)",
+        ),
+    ] = False,
     force: Annotated[
         bool,
         typer.Option(
@@ -138,7 +144,7 @@ def identify(
                 variant_cap=settings.catno_variant_cap,
                 step=stage,
                 limit=limit,
-                always_extract=always_extract,
+                always_extract=not skip_ean_photos,
                 force=force,
                 progress=progress,
             )

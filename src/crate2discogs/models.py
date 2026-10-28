@@ -48,13 +48,26 @@ def _clean_catno(catno: str | None, label: str | None) -> str | None:
     return catno.strip()
 
 
+_CATNO_SHAPE = re.compile(r"[A-Za-z]{2,}[ .\-]?\d{2,}[A-Za-z]{0,3}")
+
+
+def _catno_from_title(title: str | None) -> tuple[str | None, str | None]:
+    """A sticker line the model merged into the title: '... (C Decks Reworx / Drworx001' → catno Drworx001."""
+    if not title or " / " not in title:
+        return title, None
+    head, _, tail = title.rpartition(" / ")
+    tail = tail.strip()
+    return (head.strip(), tail) if _CATNO_SHAPE.fullmatch(tail) else (title, None)
+
+
 def postprocess(e: Extraction) -> Extraction:
-    """Move title format hints into structured fields (R-3); clean EAN digits, hints and country."""
-    title, hints, discs = strip_format_hints(e.title)
+    """Move title format hints into structured fields (R-3); clean EAN digits, hints, catno and country."""
+    raw_title, title_catno = _catno_from_title(e.title) if not e.catno else (e.title, None)
+    title, hints, discs = strip_format_hints(raw_title)
     merged = list(dict.fromkeys(h for h in (_clean_hint(x) for x in [*e.format_hints, *hints]) if h))
     if discs is None:
         discs = next((d for _, _, d in (strip_format_hints(f"x ({h})") for h in merged) if d), None)
-    catno, ean_digits = _clean_catno(e.catno, e.label), barcode_key(e.ean_digits) or None
+    catno, ean_digits = _clean_catno(e.catno or title_catno, e.label), barcode_key(e.ean_digits) or None
     if catno and catno.isdigit() and len(catno) in (8, 12, 13):
         ean_digits, catno = ean_digits or catno, None  # the model put the EAN digits in catno
     country = re.sub(r"^\s*(?:made|printed|manufactured)\s+in\s+", "", e.country or "", flags=re.IGNORECASE)
