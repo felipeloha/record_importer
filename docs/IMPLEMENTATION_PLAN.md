@@ -227,14 +227,15 @@ Points per matching field are constants in `scoring.py` (barcode 5, catno 4, art
 
 ## Step 9 — Search cascade
 
-**Build:** `search.py`: given an `Extraction` + barcodes → an ordered list of query param dicts per FR-4, executed until `resolve()` (Step 8) on the candidates so far returns `auto`, or the budget (default 8) runs out. Every query includes `type=release, format=Vinyl`. Catno queries use the printed form or its variants, never `catno_key`. All candidates are stored with their `source_query`. Pipeline stage `match`.
+**Build:** `search.py`: given an `Extraction` + barcodes → an ordered list of query param dicts per FR-4, executed until a candidate matches on barcode or catno (`Scored.hard_match`, Step 8), or the budget (default 8) runs out. Every query includes `type=release, format=Vinyl`. Catno queries use the printed form or its variants, never `catno_key`. All candidates are stored with their `source_query`. Pipeline stage `match`.
 
 **Tests (pure, with a fake client):**
 - Valid EAN present → first query is `{barcode: …}`.
 - No EAN, catno + label → first query is `{catno, label}` with the catno as printed; on empty results, the variant queries follow in order.
 - Only artist + title → `{artist, release_title}`, then `q`.
 - The budget is respected (budget=3 → at most 3 calls).
-- Short-circuit: an `auto` result on query 1 → no further queries.
+- Short-circuit: a barcode/catno match on query 1 → no further queries, even if the result is ambiguous (`review`).
+- No catno match yet (Discogs near miss) → the OCR variant queries follow.
 - The shop code is never present in any query (R-2).
 - `ean_digits` from the extraction is used only if its checksum is valid.
 

@@ -58,7 +58,7 @@ Every photo contains at least one strong identifier. The pipeline must handle al
 - Invalid JSON gets one retry with a stricter prompt. After that, mark the photo `extract_failed` and continue.
 
 ### FR-4 Discogs search cascade
-Queries run in order and stop as soon as the candidates found so far give an `auto` outcome (FR-5):
+Queries run in order and stop as soon as any candidate matches on barcode or catno (incl. OCR variants). More queries could only add competitors; FR-5 then decides `auto` or `review`.
 1. `barcode=<EAN>` (from the decoder, otherwise from `ean_digits` if the checksum is valid)
 2. `catno=<catno>` + `label=<label>`
 3. `catno=<variant>` for each catno variant (capped, default 6)

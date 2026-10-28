@@ -8,6 +8,7 @@ from crate2discogs.db import BarcodeRow, CandidateRow, ExtractionRow, Photo, Rep
 from crate2discogs.extract.base import ExtractionFailed, Extractor
 from crate2discogs.models import Extraction
 from crate2discogs.scoring import Scored, rank, resolve
+from crate2discogs.search import Search, run_search
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +27,25 @@ def candidate_rows(ranked: list[Scored]) -> list[CandidateRow]:
         )
         for i, s in enumerate(ranked)
     ]
+
+
+def run_match(
+    repo: Repo, search: Search, budget: int = 8, variant_cap: int = 6, limit: int | None = None
+) -> int:
+    """Search Discogs for photos at `extracted` or `extract_failed` and store the candidates.
+
+    Discogs errors (after retries) stop the stage; a re-run continues where it stopped.
+    """
+    photos = repo.photos_at_stage("extracted", limit)
+    photos += repo.photos_at_stage("extract_failed", None if limit is None else max(0, limit - len(photos)))
+    for photo in photos:
+        extraction = load_extraction(repo, photo.id)
+        barcodes = repo.get_barcodes(photo.id)
+        result = run_search(search, extraction, barcodes, budget, variant_cap)
+        repo.replace_candidates(photo.id, candidate_rows(rank(result.candidates, extraction, barcodes)))
+        repo.set_stage(photo.id, "matched")
+        log.info("match photo=%s calls=%s candidates=%s", photo.id, result.calls, len(result.candidates))
+    return len(photos)
 
 
 def run_resolve(repo: Repo, margin: float, force: bool = False, limit: int | None = None) -> int:
