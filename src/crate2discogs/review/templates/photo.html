@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Photo #{{ item.photo.id }}{% endblock %}
+{% block body %}
+<p><a href="/">← queue</a></p>
+{% if error %}<div class="box error">{{ error }}</div>{% endif %}
+<div class="layout">
+  <div class="photo">
+    <img src="/photos/{{ item.photo.id }}/image" alt="photo {{ item.photo.id }}">
+    <p class="muted">#{{ item.photo.id }} · {{ item.photo.path.name }} · stage {{ item.photo.stage }}</p>
+  </div>
+  <div>
+    <div class="box">
+      <strong>Current decision:</strong>
+      {% if item.resolution %}
+        <span class="badge {{ item.resolution.outcome }}">{{ item.resolution.outcome }}</span>
+        {% if item.decided_by_user %}<span class="badge">by you</span>{% else %}<span class="badge">automatic</span>{% endif %}
+        {% if chosen %}
+          → <a href="{{ chosen.url }}" target="_blank" rel="noopener">{{ chosen.artist }} – {{ chosen.title }}</a>
+          <span class="muted">{{ chosen.label }} · {{ chosen.catno }} · {{ chosen.year }} · {{ chosen.country }}</span>
+        {% elif item.resolution.release_id %}
+          → <a href="https://www.discogs.com/release/{{ item.resolution.release_id }}" target="_blank" rel="noopener">r{{ item.resolution.release_id }}</a>
+        {% endif %}
+      {% else %}<span class="muted">none yet</span>{% endif %}
+      {% if item.decided_by_user and item.editable %}
+        <form class="inline" method="post" action="/photos/{{ item.photo.id }}/undo"><button type="submit">Undo my choice</button></form>
+      {% endif %}
+      {% if not item.editable %}<p class="muted">Already added to the collection; it can't be changed here.</p>{% endif %}
+    </div>
+
+    {% if item.group and item.group.needs_copy_question %}
+    <div class="box">
+      <strong>{{ item.group.photo_ids|length }} photos matched this release:</strong>
+      {% for pid in item.group.photo_ids %}<a href="/photos/{{ pid }}">#{{ pid }}</a> {% endfor %}
+      <form method="post" action="/releases/{{ item.group.release_id }}/copies">
+        <input type="hidden" name="back" value="/photos/{{ item.photo.id }}">
+        Same record photographed twice → 1. Several copies → how many you own in total:
+        <input type="number" name="copies" min="1" max="99" value="{{ item.group.copies }}" style="width:4em">
+        <button type="submit">Save</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <h2>Top candidates</h2>
+    {% if item.candidates %}
+    <table>
+      <tr><th></th><th>Artist – Title</th><th>Label · Catno</th><th>Year · Country</th><th>Format</th><th>Score</th><th></th></tr>
+      {% for c in item.candidates %}
+      <tr>
+        <td>{% if c.thumb %}<img class="thumb" src="{{ c.thumb }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}</td>
+        <td><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.artist }} – {{ c.title }}</a></td>
+        <td>{{ c.label }}<br><span class="muted">{{ c.catno }}</span></td>
+        <td>{{ c.year }}<br><span class="muted">{{ c.country }}</span></td>
+        <td>{{ c.format }}</td>
+        <td>{{ "%.1f"|format(c.score) }}</td>
+        <td>{% if item.editable %}
+          <form class="inline" method="post" action="/photos/{{ item.photo.id }}/pick">
+            <input type="hidden" name="release_id" value="{{ c.release_id }}">
+            <button class="primary" type="submit">This one</button>
+          </form>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">No candidates found on Discogs.</p>{% endif %}
+
+    {% if item.editable %}
+    <div class="box" style="margin-top:16px">
+      <form method="post" action="/photos/{{ item.photo.id }}/paste">
+        <label>Paste a Discogs release URL or ID:
+          <input type="text" name="value" size="48" placeholder="https://www.discogs.com/release/123456-…" required>
+        </label>
+        <button type="submit">Use</button>
+      </form>
+      <form method="post" action="/photos/{{ item.photo.id }}/skip" style="margin-top:8px">
+        <button type="submit">Skip this photo</button> <span class="muted">(not added to the collection)</span>
+      </form>
+    </div>
+    {% endif %}
+
+    <h2>Read from the photo</h2>
+    <table>
+      {% set e = item.extraction %}
+      {% if e %}
+      <tr><th>type</th><td>{{ e.photo_type or "" }}</td></tr>
+      <tr><th>artist</th><td>{{ e.artist or "" }}</td></tr>
+      <tr><th>title</th><td>{{ e.title or "" }}</td></tr>
+      <tr><th>label</th><td>{{ e.label or "" }}</td></tr>
+      <tr><th>catno</th><td>{{ e.catno or "" }}{% if e.catno_candidates %} <span class="muted">(or {{ e.catno_candidates|join(", ") }})</span>{% endif %}</td></tr>
+      <tr><th>format</th><td>{{ e.format_hints|join(", ") }}{% if e.disc_count %} · {{ e.disc_count }} discs{% endif %}</td></tr>
+      <tr><th>year · country</th><td>{{ e.year or "" }} {{ e.country or "" }}</td></tr>
+      {% if e.shop_code %}<tr><th>shop code</th><td class="muted">{{ e.shop_code }} (ignored)</td></tr>{% endif %}
+      {% else %}<tr><td class="muted" colspan="2">nothing extracted</td></tr>{% endif %}
+      <tr><th>barcodes</th><td>{% for b in barcodes %}{{ b.symbology }} {{ b.value }}{% if not b.valid %} <span class="muted">(ignored)</span>{% endif %}<br>{% else %}<span class="muted">none</span>{% endfor %}</td></tr>
+      {% if item.photo.last_error %}<tr><th>error</th><td class="warn">{{ item.photo.last_error }}</td></tr>{% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

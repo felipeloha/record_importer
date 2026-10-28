@@ -170,7 +170,7 @@ def migrate(conn: sqlite3.Connection) -> None:
 
 
 def connect(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path, isolation_level=None)
+    conn = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
@@ -304,6 +304,9 @@ class Repo:
             (photo_id, res.outcome, res.release_id, res.resolved_by, _now()),
         )
         return True
+
+    def delete_resolution(self, photo_id: int) -> None:
+        self.conn.execute("DELETE FROM resolutions WHERE photo_id = ?", (photo_id,))
 
     def get_resolution(self, photo_id: int) -> ResolutionRow | None:
         r = self.conn.execute("SELECT * FROM resolutions WHERE photo_id = ?", (photo_id,)).fetchone()

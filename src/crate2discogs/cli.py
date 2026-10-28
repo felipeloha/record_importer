@@ -17,6 +17,7 @@ from crate2discogs.importer import import_dir
 from crate2discogs.pipeline import StepName
 from crate2discogs.pipeline import identify as identify_photos
 from crate2discogs.report import format_status, status_counts
+from crate2discogs.review.app import HOST, PORT, create_app
 
 app = typer.Typer(no_args_is_help=True, help="Turn photos of vinyl records into Discogs collection entries.")
 
@@ -130,9 +131,24 @@ def identify(
 
 
 @app.command()
-def review() -> None:
-    """Open the local review UI."""
-    _todo("review")
+def review(
+    port: Annotated[int, typer.Option("--port")] = PORT,
+    no_browser: Annotated[bool, typer.Option("--no-browser")] = False,
+) -> None:
+    """Open the local review UI (localhost only). Choices are saved immediately."""
+    import threading
+    import webbrowser
+
+    import uvicorn
+
+    settings = _settings()
+    repo = _repo(settings)
+    web = create_app(repo, _client(settings, repo), settings.auto_margin)
+    url = f"http://{HOST}:{port}/"
+    typer.echo(f"review UI: {url}  (Ctrl+C to stop)")
+    if not no_browser:
+        threading.Timer(1.0, webbrowser.open, args=(url,)).start()
+    uvicorn.run(web, host=HOST, port=port, log_level="warning")
 
 
 @app.command(name="add-to-collection")

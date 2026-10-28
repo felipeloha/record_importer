@@ -274,7 +274,7 @@ Points per matching field are constants in `scoring.py` (barcode 5, catno 4, art
 - Queue, collapsed section: single-photo `auto` items.
 - Item detail: photo, extracted fields, top-3 candidates with thumbnail, catno, label, year, country, format, Discogs link.
 
-Actions: pick a candidate, paste a release ID or URL, skip, set copies, override an auto. Photos are served by `/photos/{id}` from the JPEG work copy only. The `review` command opens the browser.
+Actions: pick a candidate, paste a release ID or URL, skip, set copies, override an auto, undo my choice (restores the automatic result from stored candidates, no Discogs calls). Photos already `added` can't be changed. Photos are served by `/photos/{id}` from the JPEG work copy only. The `review` command opens the browser.
 
 **Tests (FastAPI `TestClient`, mocked Discogs):**
 - The main section lists `review`, `not_found` and multi-photo groups (incl. `auto` ones); single-photo `auto` items appear in the collapsed section.
@@ -282,7 +282,7 @@ Actions: pick a candidate, paste a release ID or URL, skip, set copies, override
 - POST a pasted URL `https://www.discogs.com/release/123-Foo` → parses `123`, validates via `release(123)` (mocked); an invalid ID or a `/master/` URL → error message, no write.
 - POST skip → excluded from the add plan.
 - POST copies=2 on a group → stored in `release_groups`.
-- Overriding an auto works and is persisted.
+- Overriding an auto works and is persisted; undo restores the automatic result.
 - `/photos/{id}` for an unknown ID → 404; no endpoint accepts a file path.
 - The server binds to localhost only (assert the config).
 

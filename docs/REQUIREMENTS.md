@@ -96,7 +96,7 @@ Outcome per photo, decided by two rules:
   - every `review` and `not_found` photo
   - every group with more than one photo, even if `auto`, with the question "same record photographed twice, or N copies?"
 - Each item shows: the photo, the extracted fields, and the top 3 candidates (thumbnail, artist – title, label, catno, year, country, format, link to Discogs).
-- Actions: pick a candidate, paste a Discogs release ID or URL (validated against the API; `/master/` URLs are rejected), mark as skip, set `copies`.
+- Actions: pick a candidate, paste a Discogs release ID or URL (validated against the API; `/master/` URLs are rejected), mark as skip, set `copies`, undo my choice (back to the automatic result).
 - Auto-accepted single photos are listed in a collapsed section and can be overridden.
 - Choices persist immediately (closing the browser loses nothing).
 - Photos are served by photo ID only (never by file path), from the JPEG working copy.

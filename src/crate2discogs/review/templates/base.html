@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Review{% endblock %} · crate2discogs</title>
+<style>
+  :root { --fg:#1d1d1f; --muted:#6e6e73; --line:#d9d9de; --bg:#fafafa; --card:#fff; --accent:#2457c5; --warn:#b3261e; --ok:#1e7d32; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#ececf0; --muted:#a0a0a8; --line:#3a3a40; --bg:#151517; --card:#1f1f23; --accent:#7aa2ff; --warn:#ff8a80; --ok:#81c784; } }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.45 -apple-system, system-ui, sans-serif; color: var(--fg); background: var(--bg); margin: 0; }
+  header { padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--card); display:flex; gap:16px; align-items:baseline; }
+  header a { color: var(--fg); text-decoration: none; font-weight: 600; }
+  main { padding: 20px; max-width: 1200px; margin: 0 auto; }
+  a { color: var(--accent); }
+  h2 { font-size: 17px; margin: 28px 0 8px; }
+  .muted { color: var(--muted); }
+  .warn { color: var(--warn); }
+  .ok { color: var(--ok); }
+  table { border-collapse: collapse; width: 100%; background: var(--card); }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 13px; }
+  img.thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 4px; background: var(--line); }
+  .badge { display:inline-block; padding: 1px 7px; border-radius: 10px; font-size: 12px; border: 1px solid var(--line); }
+  .badge.review { border-color: #c98a00; } .badge.not_found { border-color: var(--warn); } .badge.auto { border-color: var(--ok); }
+  details > summary { cursor: pointer; font-weight: 600; margin: 24px 0 8px; }
+  button, input[type=submit] { font: inherit; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  input[type=text], input[type=number] { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
+  form.inline { display: inline; }
+  .layout { display: grid; grid-template-columns: minmax(280px, 480px) 1fr; gap: 24px; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  .photo img { width: 100%; border-radius: 6px; }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+  .error { border-color: var(--warn); color: var(--warn); }
+</style>
+</head>
+<body>
+<header><a href="/">crate2discogs review</a><span class="muted">choices are saved immediately</span></header>
+<main>{% block body %}{% endblock %}</main>
+</body>
+</html>

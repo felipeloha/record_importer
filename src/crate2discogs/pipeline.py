@@ -151,30 +151,38 @@ def run_match(
     return len(photos)
 
 
+def resolve_photo(repo: Repo, photo: Photo, margin: float) -> bool:
+    """Score one photo's stored candidates and save the automatic outcome.
+
+    Returns False when a user resolution exists and was kept (conflict rule).
+    """
+    stored = [(json.loads(c.payload_json), json.loads(c.source_query)) for c in repo.get_candidates(photo.id)]
+    ranked = rank(stored, load_extraction(repo, photo.id), repo.get_barcodes(photo.id))
+    result = resolve(ranked, margin)
+    repo.replace_candidates(photo.id, candidate_rows(ranked))
+    written = repo.save_resolution(photo.id, ResolutionRow(result.outcome, result.release_id, "auto"))
+    if photo.stage == "matched":
+        repo.set_stage(photo.id, "resolved")
+    log.info(
+        "resolve photo=%s outcome=%s release=%s kept_user_choice=%s",
+        photo.id,
+        result.outcome,
+        result.release_id,
+        not written,
+    )
+    return written
+
+
 def run_resolve(
     repo: Repo, margin: float, force: bool = False, limit: int | None = None, tick: Tick = _noop
 ) -> int:
-    """Score stored candidates and decide the outcome for photos at `matched`.
+    """Decide the outcome for photos at `matched`.
 
     `force` also re-scores `resolved` photos (no Discogs calls). User resolutions are never replaced.
     """
     photos = _select(repo, input_stages("resolve", force), limit)
     for photo in photos:
-        stored = [
-            (json.loads(c.payload_json), json.loads(c.source_query)) for c in repo.get_candidates(photo.id)
-        ]
-        ranked = rank(stored, load_extraction(repo, photo.id), repo.get_barcodes(photo.id))
-        result = resolve(ranked, margin)
-        repo.replace_candidates(photo.id, candidate_rows(ranked))
-        written = repo.save_resolution(photo.id, ResolutionRow(result.outcome, result.release_id, "auto"))
-        repo.set_stage(photo.id, "resolved")
-        log.info(
-            "resolve photo=%s outcome=%s release=%s kept_user_choice=%s",
-            photo.id,
-            result.outcome,
-            result.release_id,
-            not written,
-        )
+        resolve_photo(repo, photo, margin)
         tick()
     return len(photos)
 

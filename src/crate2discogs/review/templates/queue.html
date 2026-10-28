@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% macro row(item) %}
+<tr>
+  <td><a href="/photos/{{ item.photo.id }}"><img class="thumb" src="/photos/{{ item.photo.id }}/image" alt="" loading="lazy"></a></td>
+  <td><a href="/photos/{{ item.photo.id }}">#{{ item.photo.id }}</a><br><span class="muted">{{ item.photo.path.name }}</span></td>
+  <td>{{ item.summary }}</td>
+  <td>
+    {% if item.resolution %}<span class="badge {{ item.resolution.outcome }}">{{ item.resolution.outcome }}</span>{% endif %}
+    {% if item.decided_by_user %}<span class="badge">by you</span>{% endif %}
+    {% if item.photo.stage == "added" %}<span class="badge">added</span>{% endif %}
+  </td>
+  <td>{% if item.resolution and item.resolution.release_id %}<a href="https://www.discogs.com/release/{{ item.resolution.release_id }}" target="_blank" rel="noopener">r{{ item.resolution.release_id }}</a>{% endif %}</td>
+</tr>
+{% endmacro %}
+{% block title %}Queue{% endblock %}
+{% block body %}
+<section id="main">
+  <h2>Needs a decision ({{ q.needs_review|length }})</h2>
+  {% if q.needs_review %}
+  <p class="muted">Pick the right pressing, paste a Discogs release URL, or skip.</p>
+  <table>{% for item in q.needs_review %}{{ row(item) }}{% endfor %}</table>
+  {% else %}<p class="ok">Nothing left to decide.</p>{% endif %}
+
+  <h2>Several photos, one release ({{ q.groups|length }})</h2>
+  {% if q.groups %}
+  <p class="muted">Same record photographed twice, or several copies? Set how many copies you own in total.</p>
+  <table>
+  {% for g, items in q.groups %}
+  <tr>
+    <td>{% for item in items %}<a href="/photos/{{ item.photo.id }}"><img class="thumb" src="/photos/{{ item.photo.id }}/image" alt="" loading="lazy"></a> {% endfor %}</td>
+    <td><a href="https://www.discogs.com/release/{{ g.release_id }}" target="_blank" rel="noopener">r{{ g.release_id }}</a><br><span class="muted">{{ items[0].summary if items else "" }}</span></td>
+    <td>
+      <form class="inline" method="post" action="/releases/{{ g.release_id }}/copies">
+        <input type="hidden" name="back" value="/">
+        <label>copies <input type="number" name="copies" min="1" max="99" value="{{ g.copies }}" style="width:4em"></label>
+        <button type="submit">Save</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </table>
+  {% else %}<p class="muted">None.</p>{% endif %}
+</section>
+
+<section id="collapsed">
+  <details>
+    <summary>Auto-accepted ({{ q.auto|length }})</summary>
+    <p class="muted">Open one to override it.</p>
+    <table>{% for item in q.auto %}{{ row(item) }}{% endfor %}</table>
+  </details>
+  <details>
+    <summary>Decided by you ({{ q.decided|length }})</summary>
+    <table>{% for item in q.decided %}{{ row(item) }}{% endfor %}</table>
+  </details>
+</section>
+{% endblock %}

@@ -47,6 +47,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001"]  # en dash and × are intended in UI text
 
 [tool.mypy]
 python_version = "3.12"
@@ -59,6 +60,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["live: needs real services (Discogs, Ollama, claude); excluded by default"]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]
 
 [tool.coverage.run]
 source = ["crate2discogs"]
