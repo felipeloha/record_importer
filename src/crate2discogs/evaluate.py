@@ -1,4 +1,5 @@
 import time
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,7 +14,8 @@ from crate2discogs.extract.base import Extractor, ExtractResult
 from crate2discogs.importer import import_file
 from crate2discogs.models import Extraction, PhotoType
 from crate2discogs.normalize import barcode_key, catno_key, text_key
-from crate2discogs.pipeline import run_decode, run_extract
+from crate2discogs.pipeline import run_decode, run_extract, run_match, run_resolve
+from crate2discogs.search import Search
 
 FIELDS = ("photo_type", "artist", "title", "label", "catno", "ean", "disc_count")
 
@@ -112,6 +114,23 @@ class PhotoEval:
     expected: dict[str, Any]
     predicted: dict[str, Any]
     error: str | None
+    expected_release_id: int | None = None
+    outcome: str | None = None
+    release_id: int | None = None
+    top3: list[int] = field(default_factory=list)
+
+    @property
+    def verdict(self) -> str | None:
+        """AC-5 per photo: correct_auto | wrong_auto | review_ok | miss | unverified (None: not matched)."""
+        if self.outcome is None:
+            return None
+        if self.expected_release_id is None:
+            return "unverified"
+        if self.outcome == "auto":
+            return "correct_auto" if self.release_id == self.expected_release_id else "wrong_auto"
+        if self.outcome == "review" and self.expected_release_id in self.top3:
+            return "review_ok"
+        return "miss"
 
     @property
     def wrong_fields(self) -> list[str]:
@@ -144,13 +163,26 @@ class _TimedExtractor:
 
 
 def run_eval(
-    repo: Repo, entries: list[ExpectedEntry], extractor: Extractor, work_dir: Path, max_edge: int
+    repo: Repo,
+    entries: list[ExpectedEntry],
+    extractor: Extractor,
+    work_dir: Path,
+    max_edge: int,
+    search: Search | None = None,
+    margin: float = 1.0,
+    budget: int = 8,
 ) -> EvalReport:
-    """Import, decode and extract the fixture photos (cached in `repo`), then score per field."""
+    """Import, decode and extract the fixture photos (cached in `repo`), then score per field.
+
+    With `search`, also match and resolve, and compare outcomes with expected_release_id.
+    """
     ids = {e.file: import_file(repo, e.file, work_dir, max_edge)[0] for e in entries}
     timed = _TimedExtractor(extractor)
     run_decode(repo)
     run_extract(repo, timed, always_extract=True)
+    if search is not None:
+        run_match(repo, search, budget)
+        run_resolve(repo, margin, force=True)
 
     photos: list[PhotoEval] = []
     for e in entries:
@@ -159,10 +191,32 @@ def run_eval(
         extraction = Extraction.model_validate_json(row.parsed_json) if row and row.parsed_json else None
         predicted = predicted_fields(extraction, repo.get_barcodes(pid))
         expected = e.model_dump(include=set(FIELDS))
-        photos.append(PhotoEval(e.file, expected, predicted, row.error if row else "not extracted"))
+        res = repo.get_resolution(pid)
+        photos.append(
+            PhotoEval(
+                e.file,
+                expected,
+                predicted,
+                row.error if row else "not extracted",
+                e.expected_release_id,
+                res.outcome if res else None,
+                res.release_id if res else None,
+                [c.release_id for c in repo.get_candidates(pid)[:3]],
+            )
+        )
+    by_file = {p.file: p for p in photos}
+    notes = []
+    for e in entries:
+        if e.duplicate_of and by_file[e.file].outcome is not None:
+            a, b = by_file[e.file], by_file[e.duplicate_of]
+            if a.release_id is None or b.release_id is None:
+                state = "unresolved (decide in review)"
+            else:
+                state = "same release" if a.release_id == b.release_id else "DIFFERENT releases"
+            notes.append(f"duplicate {e.file.name} ~ {e.duplicate_of.name}: {state}")
     scores = field_accuracy([(p.expected, p.predicted) for p in photos])
     spp = sum(timed.durations) / len(timed.durations) if timed.durations else None
-    return EvalReport(photos, scores, spp, extractor.name, extractor.model)
+    return EvalReport(photos, scores, spp, extractor.name, extractor.model, notes)
 
 
 def format_report(report: EvalReport, total_photos: int = 500) -> str:
@@ -176,6 +230,18 @@ def format_report(report: EvalReport, total_photos: int = 500) -> str:
         )
     else:
         lines.append("\nextraction time: n/a (all extractions cached)")
+    verdicts = Counter(p.verdict for p in report.photos if p.verdict)
+    if verdicts:
+        lines.append("\noutcomes (AC-5: zero wrong_auto, no miss):")
+        for v in ("correct_auto", "review_ok", "wrong_auto", "miss", "unverified"):
+            lines.append(f"  {v:<13} {verdicts.get(v, 0):>3}")
+        for p in report.photos:
+            if p.verdict in ("wrong_auto", "miss", "unverified"):
+                lines.append(
+                    f"    {p.verdict}: {p.file.name} outcome={p.outcome} release={p.release_id} "
+                    f"top3={p.top3} expected={p.expected_release_id}"
+                )
+    lines += [f"  {n}" for n in report.notes]
     failures = [p for p in report.photos if p.wrong_fields or p.error]
     if failures:
         lines.append("\nper-photo differences (expected → predicted):")

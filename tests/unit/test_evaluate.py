@@ -113,6 +113,42 @@ def test_run_eval_scores_and_caches(tmp_path: Path) -> None:
     assert again.seconds_per_photo is None
 
 
+def test_run_eval_end_to_end_verdicts(tmp_path: Path) -> None:
+    import json
+
+    fix = json.loads(
+        (Path(__file__).parents[1] / "fixtures" / "discogs" / "search_candidates.json").read_text()
+    )
+    for w in (10, 11, 12):
+        Image.new("RGB", (w, 10), "white").save(tmp_path / f"{w}.png")
+    entries = [
+        ExpectedEntry(file=tmp_path / "10.png", photo_type="shop_sticker", expected_release_id=201),
+        ExpectedEntry(file=tmp_path / "11.png", photo_type="shop_sticker", expected_release_id=302),
+        ExpectedEntry(
+            file=tmp_path / "12.png",
+            photo_type="shop_sticker",
+            expected_release_id=302,
+            duplicate_of=tmp_path / "11.png",
+        ),
+    ]
+    surgeon = Extraction(catno="TRESOR10073LP", label="Tresor")
+    fake = Fake({10: Extraction(catno="DKMNTL 031", label="Dekmantel"), 11: surgeon, 12: surgeon})
+
+    def search(**params: object) -> dict[str, object]:
+        if params.get("catno") == "DKMNTL 031":
+            return {"results": [fix["dekmantel_031"]]}
+        if params.get("catno") == "TRESOR10073LP":
+            return {"results": [fix["surgeon_2lp"], fix["surgeon_3lp"]]}
+        return {"results": []}
+
+    report = run_eval(Repo(connect(tmp_path / "e.db")), entries, fake, tmp_path / "w", 1600, search=search)
+    verdicts = {p.file.name: p.verdict for p in report.photos}
+    assert verdicts == {"10.png": "correct_auto", "11.png": "review_ok", "12.png": "review_ok"}
+    text = format_report(report)
+    assert "wrong_auto" in text
+    assert "duplicate 12.png ~ 11.png" in text
+
+
 @pytest.mark.live
 def test_live_ollama_catno_accuracy(tmp_path: Path) -> None:
     from crate2discogs.config import load_settings
@@ -120,7 +156,9 @@ def test_live_ollama_catno_accuracy(tmp_path: Path) -> None:
 
     settings = load_settings()
     entries = load_expected(EXPECTED)
-    report = run_eval(Repo(connect(tmp_path / "eval.db")), entries, make_extractor(settings), tmp_path, 1600)
+    report = run_eval(
+        Repo(connect(tmp_path / "eval.db")), entries, make_extractor(settings), tmp_path, settings.max_edge
+    )
     print(format_report(report))
     assert report.scores["catno"].accuracy >= 0.9  # AC-3
     kompakt = next(p for p in report.photos if p.file.name.startswith("a236e6b3"))
