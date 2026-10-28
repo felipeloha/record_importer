@@ -69,8 +69,8 @@ def test_bucket_61st_request_waits(clock: FakeClock) -> None:
 
 
 @respx.mock
-def test_ratelimit_remaining_zero_pauses(client: DiscogsClient, clock: FakeClock) -> None:
-    respx.get(f"{API}/releases/1").mock(return_value=_ok({"id": 1}, **{"X-Discogs-Ratelimit-Remaining": "0"}))
+def test_ratelimit_remaining_low_pauses(client: DiscogsClient, clock: FakeClock) -> None:
+    respx.get(f"{API}/releases/1").mock(return_value=_ok({"id": 1}, **{"X-Discogs-Ratelimit-Remaining": "2"}))
     respx.get(f"{API}/releases/2").mock(return_value=_ok({"id": 2}))
     client.release(1)
     assert clock.sleeps == []
@@ -83,7 +83,7 @@ def test_429_then_200(client: DiscogsClient, clock: FakeClock) -> None:
     route = respx.get(f"{API}/releases/5").mock(side_effect=[httpx.Response(429), _ok({"id": 5})])
     assert client.release(5) == {"id": 5}
     assert route.call_count == 2
-    assert clock.sleeps == [1]
+    assert clock.sleeps == [5]
 
 
 @respx.mock
@@ -100,7 +100,7 @@ def test_three_5xx_raise_with_context(client: DiscogsClient, clock: FakeClock) -
     respx.get(f"{API}/releases/9").mock(return_value=httpx.Response(502))
     with pytest.raises(DiscogsError, match=r"/releases/9.*3 attempts.*HTTP 502"):
         client.release(9)
-    assert clock.sleeps == [1, 2, 4]
+    assert clock.sleeps == [1, 2]  # waits between the 3 attempts, none after the last
 
 
 @respx.mock
@@ -161,3 +161,29 @@ def test_identity_not_cached(client: DiscogsClient) -> None:
     client.identity()
     client.identity()
     assert route.call_count == 2
+
+
+@respx.mock
+def test_429_waits_up_to_a_minute_then_succeeds(client: DiscogsClient, clock: FakeClock) -> None:
+    route = respx.get(f"{API}/releases/5").mock(side_effect=[httpx.Response(429)] * 5 + [_ok({"id": 5})])
+    assert client.release(5) == {"id": 5}
+    assert route.call_count == 6
+    assert clock.sleeps == [5, 10, 20, 40, 60]
+
+
+@respx.mock
+def test_429_gives_up_after_about_three_minutes(client: DiscogsClient, clock: FakeClock) -> None:
+    respx.get(f"{API}/releases/5").mock(return_value=httpx.Response(429))
+    with pytest.raises(DiscogsError, match=r"7 attempts.*429"):
+        client.release(5)
+    assert sum(clock.sleeps) == 195
+
+
+def test_default_pacing_is_steady_without_burst(clock: FakeClock) -> None:
+    c = DiscogsClient("t", "me", "ua", clock=clock, sleep=clock.sleep)
+    c.bucket.clock = clock
+    c.bucket.last = clock()
+    for _ in range(5):
+        c.bucket.acquire()
+    # First request immediate, then ~60/55 s apart: no burst of 60.
+    assert clock.sleeps == [pytest.approx(60 / 55)] * 4

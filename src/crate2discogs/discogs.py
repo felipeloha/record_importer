@@ -43,16 +43,19 @@ class DiscogsClient:
         base_url: str = BASE_URL,
         attempts: int = 3,
         exhausted_pause: float = 10.0,
+        rate_limit_waits: tuple[float, ...] = (5, 10, 20, 40, 60, 60),
     ) -> None:
         self.username = username
         self.repo = repo
         self.cache_ttl = cache_ttl
         self.clock = clock
         self.sleep = sleep
-        self.bucket = bucket or TokenBucket(60, 60.0, sleep=sleep)
+        # Discogs counts 60 requests per moving minute. Pace evenly (no burst) slightly below that.
+        self.bucket = bucket or TokenBucket(55, 60.0, capacity=1, sleep=sleep)
         self.base_url = base_url.rstrip("/")
         self.attempts = attempts
         self.exhausted_pause = exhausted_pause
+        self.rate_limit_waits = rate_limit_waits
         self._pause_next = 0.0
         self.http = client or httpx.Client(timeout=30.0)
         self.headers = {"Authorization": f"Discogs token={token}", "User-Agent": user_agent}
@@ -98,26 +101,47 @@ class DiscogsClient:
         return data
 
     def _request(self, method: str, path: str, params: dict[str, Any] | None) -> dict[str, Any]:
+        """Send with pacing. 429: wait (Retry-After, else 5→60 s) and retry; 5xx/network: 3 attempts."""
         url = self.base_url + path
         last = ""
-        for attempt in range(self.attempts):
+        errors = 0  # 5xx and network errors
+        limited = 0  # 429 responses
+        sent = 0
+        while True:
             if self._pause_next:
                 self.sleep(self._pause_next)
                 self._pause_next = 0.0
             self.bucket.acquire()
+            sent += 1
             try:
                 r = self.http.request(method, url, params=params, headers=self.headers)
             except httpx.TransportError as e:
                 last = f"{type(e).__name__}: {e}"
-                self.sleep(2**attempt)
+                errors += 1
+                if errors >= self.attempts:
+                    break
+                self.sleep(2 ** (errors - 1))
                 continue
-            if r.headers.get("X-Discogs-Ratelimit-Remaining") == "0":
+            remaining = r.headers.get("X-Discogs-Ratelimit-Remaining")
+            if remaining is not None and remaining.isdigit() and int(remaining) <= 2:
                 self._pause_next = self.exhausted_pause
-            if r.status_code == 429 or r.status_code >= 500:
-                last = f"HTTP {r.status_code}"
+            if r.status_code == 429:
+                last = "HTTP 429 (rate limited)"
+                if limited >= len(self.rate_limit_waits):
+                    break
                 retry_after = r.headers.get("Retry-After")
-                self.sleep(float(retry_after) if retry_after else 2**attempt)
+                wait = float(retry_after) if retry_after else self.rate_limit_waits[limited]
+                limited += 1
+                log.info("discogs rate limited path=%s wait=%ss", path, wait)
+                self.sleep(wait)
+                continue
+            if r.status_code >= 500:
+                last = f"HTTP {r.status_code}"
+                errors += 1
+                if errors >= self.attempts:
+                    break
                 log.info("discogs retry method=%s path=%s status=%s", method, path, r.status_code)
+                self.sleep(2 ** (errors - 1))
                 continue
             if r.status_code == 404:
                 raise DiscogsNotFound(f"{method} {path}: not found")
@@ -125,4 +149,4 @@ class DiscogsClient:
                 raise DiscogsError(f"{method} {path}: HTTP {r.status_code}: {r.text[:300]}")
             body: dict[str, Any] = r.json() if r.content else {}
             return body
-        raise DiscogsError(f"{method} {path}: gave up after {self.attempts} attempts ({last})")
+        raise DiscogsError(f"{method} {path}: gave up after {sent} attempts ({last})")
