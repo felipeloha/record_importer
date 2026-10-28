@@ -96,7 +96,7 @@ record_importer/
 **Build:** `importer.py` + the `import` command: scans a dir, filters extensions, hashes, applies EXIF orientation, writes a JPEG work copy downscaled to `MAX_EDGE` (default 1600), stores paths.
 
 **Tests:**
-- Dir with `a.jpg, b.HEIC, c.png, notes.txt` → 3 imported, txt ignored. Generate the images in `tmp_path`; use `pillow-heif` to write a tiny HEIC.
+- Dir with `a.jpg, b.HEIC, c.png, d.webp, notes.txt` → 4 imported, txt ignored. Generate the images in `tmp_path`; use `pillow-heif` to write a tiny HEIC.
 - Same file under two names → 1 photo (sha dedupe).
 - Re-running import on the same dir → 0 new rows.
 - Image with EXIF orientation 6 → work copy is rotated (assert width/height swapped).

@@ -3,6 +3,10 @@ from typing import Annotated
 
 import typer
 
+from crate2discogs.config import ConfigError, Settings, load_settings
+from crate2discogs.db import Repo, connect
+from crate2discogs.importer import import_dir
+
 app = typer.Typer(no_args_is_help=True, help="Turn photos of vinyl records into Discogs collection entries.")
 
 
@@ -11,10 +15,28 @@ def _todo(name: str) -> None:
     raise typer.Exit(1)
 
 
+def _settings() -> Settings:
+    try:
+        return load_settings()
+    except ConfigError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(2) from None
+
+
+def _repo(settings: Settings) -> Repo:
+    return Repo(connect(settings.db_path))
+
+
+def _work_dir(settings: Settings) -> Path:
+    return settings.db_path.parent / "work"
+
+
 @app.command()
 def init() -> None:
     """Create the database and check the configuration."""
-    _todo("init")
+    settings = _settings()
+    _repo(settings)
+    typer.echo(f"database ready: {settings.db_path}")
 
 
 @app.command(name="import")
@@ -23,7 +45,9 @@ def import_(
     recursive: Annotated[bool, typer.Option("--recursive")] = False,
 ) -> None:
     """Import photos from a directory."""
-    _todo("import")
+    settings = _settings()
+    res = import_dir(_repo(settings), directory, _work_dir(settings), settings.max_edge, recursive)
+    typer.echo(f"{res.new} new, {res.existing} already imported")
 
 
 @app.command()

@@ -34,7 +34,7 @@ Every photo contains at least one strong identifier. The pipeline must handle al
 ## 3. Functional requirements
 
 ### FR-1 Import
-- Scan a directory (non-recursive by default, `--recursive` optional) for `.jpg .jpeg .png .heic .heif`.
+- Scan a directory (non-recursive by default, `--recursive` optional) for `.jpg .jpeg .png .heic .heif .webp`.
 - Identify each photo by SHA-256 of its file content; re-running import must not create duplicates.
 - Apply the EXIF orientation. Keep the original; create a working copy downscaled to a configurable longest edge (default 1600 px) for the vision model. The working copy is always JPEG (also used by the review UI, since browsers can't show HEIC).
 
